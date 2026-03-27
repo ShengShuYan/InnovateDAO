@@ -27,7 +27,7 @@
 负责前端与智能合约联调，确保主要用户流程可以跑通
 负责设计和整理最终 demo 流程，确保展示逻辑清晰、操作顺畅
 负责前端报错提示、状态展示和 demo 期间的页面稳定性
-	田荣远：测试、验收与文档整合负责人
+	田：测试、验收与文档整合负责人
 负责测试方案设计与测试用例编写
 负责使用 Hardhat / Foundry 对核心功能和边界情况进行验证
 重点测试 failed quorum、double voting、withdrawal restriction、execution failure、vote locking 等关键场景
