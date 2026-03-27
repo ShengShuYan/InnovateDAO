@@ -1,0 +1,27 @@
+{
+  "name": "innovate-dao",
+  "version": "1.0.0",
+  "description": "A decentralized autonomous organization with NFT-gated governance and stake-weighted voting",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.js"
+  },
+  "keywords": [
+    "dao",
+    "blockchain",
+    "ethereum",
+    "governance",
+    "solidity"
+  ],
+  "author": "InnovateDAO Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}
