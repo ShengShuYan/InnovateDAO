@@ -65,3 +65,7 @@ npm run deploy
 ## License
 
 MIT
+
+## CODE
+npx hardhat node
+npx hardhat run scripts/deploy.js --network localhost
