@@ -1,70 +1,88 @@
-# InnovateDAO
+InnovateDAO 智能合约本地测试指南
+尊敬的团队成员，大家好：
 
-A decentralized autonomous organization (DAO) smart contract with advanced governance features.
+这份文档旨在指导大家在自己的个人电脑上运行并测试我们 InnovateDAO 项目的最小可行性产品 (MVP)。
 
-## Features
+为了方便大家理解和测试，我们目前没有使用真实的公共区块链网络，而是通过工具在你的电脑上虚拟出了一条“本地私有链”。大家可以按照以下步骤，亲身体验我们设计的**“身份认证 -> 票权激活 -> 缴纳押金并发起提案”**的完整业务闭环。
 
-- **NFT-Gated Proposal Creation**: Only membership NFT holders can create proposals
-- **Stake-Weighted Voting**: Voting power based on staked ETH
-- **Voting Weight Cap**: Maximum 33% of total voting power per user
-- **Strict Governance Rules**:
-  - 60% quorum requirement
-  - >66.6% supermajority for approval
-- **Refundable Deposits**: Proposal creators pay a refundable deposit
-- **Vote Locking**: Prevents withdrawal while votes are active
+💻 阶段一：前期环境准备
+在开始之前，请确保你的电脑已经安装了以下必要工具：
 
-## Smart Contract Architecture
+Node.js: 运行本地环境的基础软件。
 
-### Core Components
+VS Code 编辑器: 用于查看代码和运行后台终端。
 
-- **InnovateDAO.sol**: Main DAO contract with governance logic
-- Uses OpenZeppelin's `ReentrancyGuard` and `Ownable` for security
-- Integrates with ERC721 NFT for membership verification
+MetaMask (小狐狸钱包): 请在你的浏览器（推荐 Chrome 或 Edge）扩展商店中安装此插件，它是我们与区块链进行交互的“数字身份凭证”。
 
-### Key Functions
+安装项目依赖包: 在 VS Code 中打开本项目文件夹，在顶部菜单栏选择 终端 (Terminal) -> 新建终端，输入命令 npm install 并回车，等待系统自动下载底层依赖文件。
 
-1. **createProposal**: Create a new proposal (NFT holders only, requires deposit)
-2. **castVote**: Vote on active proposals (weight capped at 33%)
-3. **executeProposal**: Execute proposal after voting period if quorum and supermajority met
-4. **stake**: Stake ETH to gain voting power
-5. **withdrawStake**: Withdraw staked ETH (only if no active votes)
-6. **unlockVote**: Unlock voting power after proposal deadline
+⚙️ 阶段二：启动本地运行环境
+由于我们是在本地模拟区块链，因此需要先启动一个“本地服务器”，然后再把我们的规则（智能合约）部署上去。
 
-## Installation
+第 1 步：启动本地虚拟区块链
+在 VS Code 的终端面板中，输入命令：npx hardhat node 并按回车。
 
-```bash
-npm install
-```
+运行结果： 你会看到屏幕上输出了 20 个带有 Account 和 Private Key (私钥) 的地址列表。这是系统自动为我们生成的测试账户，每个账户内预置了 10,000 个模拟的 ETH 资金，专门用于本次测试。
 
-## Compilation
+⚠️ 关键提醒： 请让这个终端窗口保持一直开启的状态，切勿关闭或按 Ctrl+C。它就相当于我们的后台服务器，一旦关闭，后续的所有操作都会失效。
 
-```bash
-npm run compile
-```
+第 2 步：部署智能合约
+在 VS Code 的终端面板右上角，点击 + 号图标，新建第二个终端窗口。
 
-## Testing
+在这个新的终端内，输入命令：npx hardhat run scripts/deploy.js --network localhost 并按回车。
 
-```bash
-npm run test
-```
+运行结果： 终端会打印出两行绿色的成功提示，并附带两个以 0x 开头的长字符串（这是我们 NFT 门票和 Governor 治理金库的部署地址）。此时，我们的业务逻辑已成功载入本地网络。
 
-## Deployment
+🦊 阶段三：配置浏览器钱包 (MetaMask)
+为了让网页能够调用你刚才获得的测试资金，我们需要将 MetaMask 连接到你的本地网络。
 
-```bash
-npm run deploy
-```
+第 1 步：添加本地网络
+点击浏览器右上角的 MetaMask 插件图标，打开钱包面板。
 
-## Governance Parameters
+点击左上角的网络选择下拉菜单，点击**“添加网络”** -> “手动添加网络”。
 
-- **Quorum**: 60% of total staked supply must participate
-- **Supermajority**: >66.6% approval rate required
-- **Voting Weight Cap**: Individual voting power capped at 33% of total
-- **Voting Period**: Configurable (set during deployment)
-- **Proposal Deposit**: Refundable deposit required to create proposals
+请严格按照以下信息填写表单：
 
-## License
+网络名称: Hardhat Local
 
-MIT
+新增 RPC URL: http://127.0.0.1:8545
+
+链 ID: 1337
+
+货币符号: ETH
+
+点击“保存”并切换至该网络。
+
+第 2 步：导入测试账户与资金
+在 MetaMask 主界面，点击顶部的账户下拉菜单，选择**“导入账户” (Import Account)**。
+
+回到你的 VS Code 第一个终端窗口，复制 Account #0 下方的那串 Private Key (私钥)。
+
+将私钥粘贴至 MetaMask 并点击导入。导入成功后，你会看到该账户内显示拥有 10000 ETH 的模拟资金。
+
+🌐 阶段四：启动前端并测试业务闭环
+现在，后端与资金均已准备就绪，我们可以通过前端页面体验产品的核心功能了。
+
+启动测试页面： 在 VS Code 的文件目录中找到 index.html 文件。推荐右键点击该文件并选择 Open with Live Server（如无此选项，可在 VS Code 插件市场搜索安装 "Live Server"）。网页将在浏览器中自动打开。
+
+第一步 - 连接身份： 点击网页上的 “1. 连接钱包” 按钮。在弹出的 MetaMask 窗口中授权连接你刚才导入的测试账户。
+
+第二步 - 获取治理权限： 点击 “2. 领取 DAO 门票 (NFT) 并激活票权” 按钮。
+
+此操作会触发两次 MetaMask 签名确认。第一笔交易是系统向你发放 InnovateDAO 成员 NFT；第二笔交易是向底层的 OpenZeppelin 框架注册你的投票权重。
+
+等待页面提示成功后，你即正式具备了提案与投票资格。
+
+第三步 - 体验押金提案机制：
+
+在输入框中填写任意提案描述（例如：“申请采购实验室设备”）。
+
+点击 “3. 缴纳 0.1 ETH 发起提案” 按钮。
+
+此时 MetaMask 会要求你支付 0.1 ETH 的资金。这正是我们设计的核心安全防线——通过经济成本来防范恶意刷单提案。
+
+确认支付后，等待页面出现绿色的成功提示即可！
+
 
 ## CODE
 npx hardhat node
