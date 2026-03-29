@@ -1,127 +1,112 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <title>InnovateDAO 极简前端测试</title>
+    <title>InnovateDAO 孵化基金</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.3/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 50px; text-align: center; }
-        button { padding: 10px 20px; font-size: 16px; margin: 10px; cursor: pointer; }
-        input { width: 300px; padding: 10px; font-size: 16px; margin: 10px; }
-        #status, #proposeStatus { margin-top: 20px; font-weight: bold; color: #333; }
-        .section { margin: 30px 0; padding: 20px; border: 1px solid #eee; border-radius: 10px; background-color: #fcfcfc;}
-    </style>
 </head>
-<body>
+<body class="bg-base-200 min-h-screen font-sans">
 
-    <h1>🏛️ InnovateDAO 学生孵化基金</h1>
-    
-    <div class="section">
-        <button id="connectBtn">1. 连接钱包</button>
-        <button id="mintBtn" disabled>2. 领取 DAO 门票 (NFT) 并激活票权</button>
-        <p id="status">请先连接钱包...</p>
+    <div class="navbar bg-base-100 shadow-sm px-8">
+        <div class="flex-1">
+            <a class="btn btn-ghost text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">🏛️ InnovateDAO</a>
+        </div>
+        <div class="flex-none">
+            <button id="connectBtn" class="btn btn-primary btn-outline shadow-sm">连接钱包</button>
+        </div>
     </div>
 
-    <div class="section">
-        <h2>💡 发起资金提案</h2>
-        <input type="text" id="descInput" placeholder="输入提案描述 (例如: 买一栋楼)">
-        <button id="proposeBtn" disabled>3. 缴纳 0.1 ETH 发起提案</button>
-        <p id="proposeStatus"></p>
+    <div class="container mx-auto p-8 max-w-4xl mt-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div class="card bg-base-100 shadow-xl border border-base-300">
+                <div class="card-body">
+                    <h2 class="card-title text-xl mb-2">🎟️ 成员身份认证</h2>
+                    <p class="text-gray-500 text-sm mb-4">加入 DAO，获取专属 NFT 门票并激活你的投票权，共同决定校园基金的走向。</p>
+                    <div class="card-actions justify-end mt-auto">
+                        <button id="mintBtn" class="btn btn-secondary w-full" disabled>领取门票并激活</button>
+                    </div>
+                    <p id="status" class="text-xs text-center mt-2 text-gray-400">等待连接钱包...</p>
+                </div>
+            </div>
+
+            <div class="card bg-base-100 shadow-xl border border-base-300">
+                <div class="card-body">
+                    <h2 class="card-title text-xl mb-2">💡 发起资金提案</h2>
+                    <p class="text-gray-500 text-sm mb-4">为你的创业项目申请资金支持。需缴纳 0.1 ETH 押金以防止恶意刷单。</p>
+                    <input type="text" id="descInput" placeholder="例如: 申请 1 ETH 购买服务器" class="input input-bordered input-primary w-full mb-2" />
+                    <div class="card-actions justify-end mt-auto">
+                        <button id="proposeBtn" class="btn btn-primary w-full" disabled>缴纳 0.1 ETH 提交提案</button>
+                    </div>
+                    <p id="proposeStatus" class="text-xs text-center mt-2 text-gray-400"></p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="mt-12">
+            <h2 class="text-2xl font-bold mb-6 border-b pb-2">📋 提案广场 (开发中)</h2>
+            <div class="alert alert-info shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>这里未来将展示所有活跃的提案，并提供赞成/反对的投票按钮！</span>
+            </div>
+        </div>
     </div>
 
     <script>
-        // 填入你刚才部署的合约地址
         const nftAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
         const governorAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
         
-        // 极简魔法：人类可读 ABI
-        const nftAbi = [
-            "function safeMint(address to) public",
-            "function delegate(address delegatee) public",
-            "function balanceOf(address owner) view returns (uint256)"
-        ];
-        
-        const governorAbi = [
-            "function proposeWithDeposit(address[] targets, uint256[] values, bytes[] calldatas, string description) public payable returns (uint256)"
-        ];
+        const nftAbi = ["function safeMint(address to) public", "function delegate(address delegatee) public"];
+        const governorAbi = ["function proposeWithDeposit(address[] targets, uint256[] values, bytes[] calldatas, string description) public payable returns (uint256)"];
 
-        let signer;
-        let nftContract;
-        let governorContract;
+        let signer, nftContract, governorContract;
 
-        // 按钮 1：连接 MetaMask
         document.getElementById("connectBtn").onclick = async () => {
             if (window.ethereum) {
                 try {
                     await window.ethereum.request({ method: 'eth_requestAccounts' });
                     const provider = new ethers.BrowserProvider(window.ethereum);
                     signer = await provider.getSigner();
-                    
-                    // 统一在这里初始化两个合约
                     nftContract = new ethers.Contract(nftAddress, nftAbi, signer);
                     governorContract = new ethers.Contract(governorAddress, governorAbi, signer);
                     
-                    document.getElementById("status").innerText = "✅ 钱包已连接: " + signer.address;
+                    // 截断显示钱包地址
+                    const address = signer.address;
+                    document.getElementById("connectBtn").innerText = `${address.substring(0,6)}...${address.substring(38)}`;
+                    document.getElementById("connectBtn").classList.remove("btn-outline");
                     
-                    // 钱包连接成功后，同时解锁发门票和发起提案的按钮
                     document.getElementById("mintBtn").disabled = false;
                     document.getElementById("proposeBtn").disabled = false;
-                } catch (err) {
-                    console.error(err);
-                    document.getElementById("status").innerText = "❌ 连接失败或被拒绝";
-                }
-            } else {
-                alert("请先在浏览器安装 MetaMask 插件！");
-            }
+                    document.getElementById("status").innerText = "钱包已连接";
+                } catch (err) { console.error(err); }
+            } else { alert("请安装 MetaMask！"); }
         };
 
-        // 按钮 2：交互智能合约 (铸造 NFT + 委托)
         document.getElementById("mintBtn").onclick = async () => {
             try {
-                document.getElementById("status").innerText = "⏳ 正在向区块链发送铸造请求，请在钱包中确认...";
-                const tx1 = await nftContract.safeMint(signer.address);
-                await tx1.wait(); 
-                
-                document.getElementById("status").innerText = "⏳ 门票已到手！正在激活投票权...";
-                const tx2 = await nftContract.delegate(signer.address);
-                await tx2.wait();
-                
-                document.getElementById("status").innerText = "🎉 成功！你现在拥有了 InnovateDAO 的投票权！";
-            } catch (err) {
-                console.error(err);
-                document.getElementById("status").innerText = "❌ 交易失败 (你可能已经领过票了，请按 F12 查看报错)";
-            }
+                document.getElementById("status").innerText = "正在确认铸造交易...";
+                await (await nftContract.safeMint(signer.address)).wait(); 
+                document.getElementById("status").innerText = "正在激活投票权...";
+                await (await nftContract.delegate(signer.address)).wait();
+                document.getElementById("status").innerText = "🎉 成功！您已获得投票权";
+                document.getElementById("status").classList.add("text-success");
+            } catch (err) { document.getElementById("status").innerText = "❌ 交易失败"; document.getElementById("status").classList.add("text-error"); }
         };
 
-        // 按钮 3：发起提案并缴纳押金
         document.getElementById("proposeBtn").onclick = async () => {
             const desc = document.getElementById("descInput").value;
-            if (!desc) {
-                alert("老板，请先输入提案描述再点发起呀！");
-                return;
-            }
-
+            if (!desc) return alert("请输入提案描述");
             try {
-                document.getElementById("proposeStatus").innerText = "⏳ 正在唤起钱包，请确认支付 0.1 ETH 押金...";
-                
-                const targets = [signer.address];
-                const values = [0]; 
-                const calldatas = ["0x"];
-                
-                // 核心逻辑：发起提案并携带 0.1 ETH 押金
-                const depositAmount = ethers.parseEther("0.1");
-                const tx = await governorContract.proposeWithDeposit(targets, values, calldatas, desc, {
-                    value: depositAmount
-                });
-                
-                document.getElementById("proposeStatus").innerText = "⏳ 交易已发送，等待区块链打包确认中...";
-                await tx.wait(); // 等待上链
-                
-                document.getElementById("proposeStatus").innerText = "✅ 提案发起成功！0.1 ETH 押金已锁定在金库！";
-            } catch (err) {
-                console.error(err);
-                document.getElementById("proposeStatus").innerText = "❌ 提案失败，请检查控制台 (确认钱包里有没有钱，或者网络是否正常)。";
-            }
+                document.getElementById("proposeStatus").innerText = "等待钱包确认支付押金...";
+                const tx = await governorContract.proposeWithDeposit([signer.address], [0], ["0x"], desc, { value: ethers.parseEther("0.1") });
+                document.getElementById("proposeStatus").innerText = "打包中...";
+                await tx.wait();
+                document.getElementById("proposeStatus").innerText = "✅ 提案发起成功！";
+                document.getElementById("proposeStatus").classList.add("text-success");
+            } catch (err) { document.getElementById("proposeStatus").innerText = "❌ 提案失败"; document.getElementById("proposeStatus").classList.add("text-error");}
         };
     </script>
 </body>
