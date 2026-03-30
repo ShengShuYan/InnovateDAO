@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFractio
 
 /**
  * @title InnovateDAOGovernor
- * @notice 结合了 OpenZeppelin 工业级安全标准与 FT5004 定制化需求的核心治理大脑
+ * @notice Core governance brain combining OpenZeppelin industrial-grade security standards with customized requirements.
  */
 contract InnovateDAOGovernor is 
     Governor, 
@@ -18,13 +18,13 @@ contract InnovateDAOGovernor is
     GovernorVotes, 
     GovernorVotesQuorumFraction 
 {
-    // ============ 自定义状态变量 ============
+    // ============ Custom State Variables ============
     
-    uint256 public proposalDeposit; // 提案所需的押金金额
-    mapping(uint256 => uint256) public deposits; // 记录每个提案的押金
-    mapping(uint256 => address) public proposers; // 记录提案发起人
+    uint256 public proposalDeposit; // Required deposit amount for a proposal
+    mapping(uint256 => uint256) public deposits; // Records the deposit for each proposal
+    mapping(uint256 => address) public proposers; // Records the proposer of each proposal
 
-    // ============ 构造函数 ============
+    // ============ Constructor ============
     
     constructor(
         IVotes _token, 
@@ -32,20 +32,20 @@ contract InnovateDAOGovernor is
     )
         Governor("InnovateDAOGovernor")
         GovernorSettings(
-            1, /* 1 个区块的投票延迟 (Voting Delay) */
-            50400, /* 约 1 周的投票期 (Voting Period，假设 12 秒一个区块) */
-            0 /* 提案门槛 (Proposal Threshold)，我们用押金代替了代币门槛 */
+            1, /* 1 block voting delay */
+            50400, /* Approx. 1 week voting period (assuming 12s per block) */
+            0 /* Proposal threshold (0 since we use deposit instead of token threshold) */
         )
         GovernorVotes(_token)
-        GovernorVotesQuorumFraction(60) // 核心亮点：强制 60% 的法定参与率 (Quorum)
+        GovernorVotesQuorumFraction(60) // Core feature: Enforces a 60% quorum
     {
         proposalDeposit = _proposalDeposit;
     }
 
-    // ============ 核心定制 1：带押金的提案机制 (防垃圾信息) ============
+    // ============ Custom Feature 1: Proposal with Deposit (Anti-Spam) ============
     
     /**
-     * @notice 包装了标准的 propose 函数，强制要求缴纳押金
+     * @notice Wraps the standard propose function to enforce a deposit payment.
      */
     function proposeWithDeposit(
         address[] memory targets,
@@ -55,20 +55,20 @@ contract InnovateDAOGovernor is
     ) public payable returns (uint256) {
         require(msg.value == proposalDeposit, "InnovateDAO: Must pay the exact proposal deposit");
         
-        // 调用底层框架生成提案
+        // Call the underlying framework to create the proposal
         uint256 proposalId = super.propose(targets, values, calldatas, description);
         
-        // 记录押金状态
+        // Record the deposit status
         deposits[proposalId] = msg.value;
         proposers[proposalId] = msg.sender;
         
         return proposalId;
     }
 
-    // ============ 核心定制 2：33% 投票权重上限 (防巨鲸垄断) ============
+    // ============ Custom Feature 2: 33% Voting Weight Cap (Anti-Whale) ============
     
     /**
-     * @notice 重写计票逻辑。在记录选票前，动态拦截并计算 33% 权重上限
+     * @notice Overrides the vote counting logic. Dynamically calculates and applies a 33% weight cap before recording.
      */
     function _countVote(
         uint256 proposalId,
@@ -77,24 +77,24 @@ contract InnovateDAOGovernor is
         uint256 weight,
         bytes memory params
     ) internal virtual override(Governor, GovernorCountingSimple) returns (uint256) {
-        // 获取提案发起时的总票数快照
+        // Get a snapshot of the total supply at the time the proposal was created
         uint256 timepoint = proposalSnapshot(proposalId);
         uint256 totalPastSupply = token().getPastTotalSupply(timepoint);
         
-        // 计算 33% 的硬性上限
+        // Calculate the strict 33% cap
         uint256 maxWeight = (totalPastSupply * 33) / 100;
         
-        // 如果用户的票数超过上限，强行截断为 maxWeight
+        // Cap the user's weight at maxWeight if it exceeds the limit
         uint256 effectiveWeight = weight > maxWeight ? maxWeight : weight;
         
-        // 调用底层的简单计票逻辑（按裁剪后的权重计入赞成/反对）并返回结果
+        // Call the underlying counting logic with the capped weight and return the result
         return super._countVote(proposalId, account, support, effectiveWeight, params);
     }
 
-    // ============ 核心定制 3：66.6% 绝对多数门槛 ============
+    // ============ Custom Feature 3: 66.6% Supermajority Threshold ============
     
     /**
-     * @notice 重写提案成功判定逻辑。默认是赞成>反对，我们改为必须达到 66.6% 赞成率
+     * @notice Overrides the successful proposal logic. Requires a 66.6% approval rate instead of simple majority.
      */
     function _voteSucceeded(uint256 proposalId) internal view virtual override(Governor, GovernorCountingSimple) returns (bool) {
         (uint256 againstVotes, uint256 forVotes, ) = proposalVotes(proposalId);
@@ -102,14 +102,14 @@ contract InnovateDAOGovernor is
         
         if (totalVotes == 0) return false;
         
-        // 赞成票必须大于总票数的 66.6% (6666/10000)
+        // For votes must be greater than 66.6% (6666/10000) of the total votes
         return forVotes > (totalVotes * 6666) / 10000;
     }
 
-    // ============ 核心定制 4：未达法定人数的押金惩罚 (Slashing) ============
+    // ============ Custom Feature 4: Deposit Slashing for Failed Quorum ============
     
     /**
-     * @notice 提案结束后，允许发起人取回押金。如果未达法定人数，押金将被扣留。
+     * @notice Allows the proposer to claim their deposit after the proposal ends. The deposit is slashed if quorum is not reached.
      */
     function claimRefund(uint256 proposalId) external {
         require(state(proposalId) == ProposalState.Defeated || state(proposalId) == ProposalState.Executed || state(proposalId) == ProposalState.Succeeded, "InnovateDAO: Proposal not finished");
@@ -118,19 +118,19 @@ contract InnovateDAOGovernor is
         uint256 amount = deposits[proposalId];
         require(amount > 0, "InnovateDAO: No deposit to claim or already claimed");
 
-        // 惩罚机制：如果提案被否决，且总票数未达到 60% 法定人数，直接没收押金
+        // Slashing mechanism: If the proposal is defeated and fails to reach the 60% quorum, the deposit is confiscated.
         if (state(proposalId) == ProposalState.Defeated && !_quorumReached(proposalId)) {
             revert("InnovateDAO: Deposit slashed due to quorum shortfall");
         }
 
-        // 清零状态并退款
+        // Clear the deposit status and refund
         deposits[proposalId] = 0;
         (bool success, ) = msg.sender.call{value: amount}("");
         require(success, "InnovateDAO: Refund failed");
     }
 
-    // ============ 必需的系统重写 (Solidity 语法要求) ============
-    // 这些函数只是为了解决多重继承的冲突，让框架正常运转
+    // ============ Required System Overrides (Solidity Requirements) ============
+    // These functions resolve multiple inheritance conflicts to keep the framework running correctly.
     
     function votingDelay() public view override(Governor, GovernorSettings) returns (uint256) {
         return super.votingDelay();

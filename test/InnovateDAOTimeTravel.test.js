@@ -2,9 +2,9 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { mine } = require("@nomicfoundation/hardhat-network-helpers");
 
-describe("InnovateDAO 全链路集成测试 (时间旅行与自动打款)", function () {
+describe("InnovateDAO End-to-End Integration Test (Time Travel and Automated Funding)", function () {
   let nft, governor;
-  let owner, user1, user2, user3; // 🕵️‍♂️ 修复点 1：多拉一个 user3 进来凑数
+  let owner, user1, user2, user3; // Fix 1: Introduce user3 to expand the voter pool
   let proposalId;
   const depositAmount = ethers.parseEther("0.1");
   const grantAmount = ethers.parseEther("1.0");
@@ -17,8 +17,9 @@ describe("InnovateDAO 全链路集成测试 (时间旅行与自动打款)", func
     const Governor = await ethers.getContractFactory("InnovateDAOGovernor");
     governor = await Governor.deploy(await nft.getAddress(), depositAmount);
 
-    // 🕵️‍♂️ 修复点 2：给 4 个人发 NFT。总发行量 = 4。
-    // 这样 4 * 33% = 1.32，Solidity 取整后上限是 1 票，不再是 0 票了！
+    // Fix 2: Mint NFTs for 4 users to set the total supply to 4.
+    // This ensures that 4 * 33% = 1.32. Solidity truncates this to a cap of 1 vote, 
+    // avoiding the previous 0-vote calculation bug.
     await nft.safeMint(owner.address);
     await nft.safeMint(user1.address);
     await nft.safeMint(user2.address);
@@ -37,7 +38,7 @@ describe("InnovateDAO 全链路集成测试 (时间旅行与自动打款)", func
     const targets = [user1.address];
     const values = [grantAmount];
     const calldatas = ["0x"];
-    const description = "社团咖啡机采购经费";
+    const description = "Funding for club coffee machine";
 
     const tx = await governor.connect(user1).proposeWithDeposit(targets, values, calldatas, description, {
       value: depositAmount
@@ -46,15 +47,15 @@ describe("InnovateDAO 全链路集成测试 (时间旅行与自动打款)", func
     proposalId = receipt.logs.find(log => log.fragment && log.fragment.name === 'ProposalCreated').args[0];
   });
 
-  it("极限测试：快进时间 -> 完成投票 -> 验证资金自动拨付", async function () {
+  it("Stress Test: Fast-forward time -> Complete voting -> Verify automated funding", async function () {
     await mine(2);
 
-    // 🕵️‍♂️ 修复点 3：让 3 个人投票。
-    // 3 票 / 总共 4 票 = 75% 参与率，完美超过 60% 的 Quorum 要求！
+    // Fix 3: Have 3 members cast their votes.
+    // 3 votes / 4 total supply = 75% participation rate, perfectly exceeding the 60% Quorum requirement!
     await governor.connect(user1).castVote(proposalId, 1);
     await governor.connect(user2).castVote(proposalId, 1);
     await governor.connect(user3).castVote(proposalId, 1);
-    console.log("      🗳️ 投票已完成！");
+    console.log("      🗳️ Voting completed!");
 
     await mine(50401);
 
@@ -63,13 +64,14 @@ describe("InnovateDAO 全链路集成测试 (时间旅行与自动打款)", func
     const targets = [user1.address];
     const values = [grantAmount];
     const calldatas = ["0x"];
-    const descriptionHash = ethers.id("社团咖啡机采购经费");
+    // The description hash MUST exactly match the description string used when creating the proposal
+    const descriptionHash = ethers.id("Funding for club coffee machine");
 
     await governor.execute(targets, values, calldatas, descriptionHash);
 
     const balanceAfter = await ethers.provider.getBalance(user1.address);
     expect(balanceAfter > balanceBefore).to.be.true;
     
-    console.log("      💰 提案执行成功，1 ETH 资金已自动拨付到账！");
+    console.log("      💰 Proposal executed successfully, 1 ETH has been automatically transferred!");
   });
 });

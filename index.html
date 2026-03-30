@@ -1,11 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <title>InnovateDAO 孵化基金</title>
+    <title>InnovateDAO Incubation Fund</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.3/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 </head>
 <body class="bg-base-200 min-h-screen font-sans">
 
@@ -14,31 +13,47 @@
             <a class="btn btn-ghost text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">🏛️ InnovateDAO</a>
         </div>
         <div class="flex-none">
-            <button id="connectBtn" class="btn btn-primary btn-outline shadow-sm">连接钱包</button>
+            <button id="connectBtn" class="btn btn-primary btn-outline shadow-sm">Connect Wallet</button>
         </div>
     </div>
 
-    <div class="container mx-auto p-8 max-w-4xl mt-8">
+    <div class="container mx-auto p-8 max-w-4xl mt-6">
+        <div class="stats shadow-lg bg-base-100 w-full border border-primary/20">
+            <div class="stat text-center">
+                <div class="stat-title">InnovateDAO Members</div>
+                <div class="stat-value text-primary">Students / Faculty</div>
+                <div class="stat-desc">All NFT Holders</div>
+            </div>
+            
+            <div class="stat text-center">
+                <div class="stat-title text-accent">🏛️ Incubation Fund Treasury Balance</div>
+                <div id="treasuryBalance" class="stat-value text-accent">0.00 ETH</div>
+                <div class="stat-desc text-gray-500"> Code is Law - Auto-Disbursement </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-8 max-w-4xl mt-2">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             <div class="card bg-base-100 shadow-xl border border-base-300">
                 <div class="card-body">
-                    <h2 class="card-title text-xl mb-2">🎟️ 成员身份认证</h2>
-                    <p class="text-gray-500 text-sm mb-4">加入 DAO，获取专属 NFT 门票并激活你的投票权，共同决定校园基金的走向。</p>
+                    <h2 class="card-title text-xl mb-2">🎟️ Membership & Voting Rights</h2>
+                    <p class="text-gray-500 text-sm mb-4">Join the DAO, claim your exclusive NFT pass, and activate your voting rights to co-determine the direction of the campus fund.</p>
                     <div class="card-actions justify-end mt-auto">
-                        <button id="mintBtn" class="btn btn-secondary w-full" disabled>领取门票并激活</button>
+                        <button id="mintBtn" class="btn btn-secondary w-full" disabled>Mint NFT & Delegate Votes</button>
                     </div>
-                    <p id="status" class="text-xs text-center mt-2 text-gray-400">等待连接钱包...</p>
+                    <p id="status" class="text-xs text-center mt-2 text-gray-400">Waiting for wallet connection...</p>
                 </div>
             </div>
 
             <div class="card bg-base-100 shadow-xl border border-base-300">
                 <div class="card-body">
-                    <h2 class="card-title text-xl mb-2">💡 发起资金提案</h2>
-                    <p class="text-gray-500 text-sm mb-4">为你的创业项目申请资金支持。需缴纳 0.1 ETH 押金以防止恶意刷单。</p>
-                    <input type="text" id="descInput" placeholder="例如: 申请 1 ETH 购买服务器" class="input input-bordered input-primary w-full mb-2" />
+                    <h2 class="card-title text-xl mb-2">💡 Submit Funding Proposal</h2>
+                    <p class="text-gray-500 text-sm mb-4">Apply for funding for your project. A 0.1 ETH deposit is required to prevent spam proposals.</p>
+                    <input type="text" id="descInput" placeholder="e.g., Request 1 ETH for server costs" class="input input-bordered input-primary w-full mb-2" />
                     <div class="card-actions justify-end mt-auto">
-                        <button id="proposeBtn" class="btn btn-primary w-full" disabled>缴纳 0.1 ETH 提交提案</button>
+                        <button id="proposeBtn" class="btn btn-primary w-full" disabled>Pay 0.1 ETH & Submit Proposal</button>
                     </div>
                     <p id="proposeStatus" class="text-xs text-center mt-2 text-gray-400"></p>
                 </div>
@@ -47,67 +62,17 @@
         </div>
 
         <div class="mt-12">
-            <h2 class="text-2xl font-bold mb-6 border-b pb-2">📋 提案广场 (开发中)</h2>
+            <h2 class="text-2xl font-bold mb-6 border-b pb-2">📋 Proposal Board (In Development)</h2>
             <div class="alert alert-info shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span>这里未来将展示所有活跃的提案，并提供赞成/反对的投票按钮！</span>
+                <span>This area will display all active proposals and provide For/Against voting buttons!</span>
             </div>
         </div>
     </div>
 
-    <script>
-        const nftAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-        const governorAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
-        
-        const nftAbi = ["function safeMint(address to) public", "function delegate(address delegatee) public"];
-        const governorAbi = ["function proposeWithDeposit(address[] targets, uint256[] values, bytes[] calldatas, string description) public payable returns (uint256)"];
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
 
-        let signer, nftContract, governorContract;
-
-        document.getElementById("connectBtn").onclick = async () => {
-            if (window.ethereum) {
-                try {
-                    await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    const provider = new ethers.BrowserProvider(window.ethereum);
-                    signer = await provider.getSigner();
-                    nftContract = new ethers.Contract(nftAddress, nftAbi, signer);
-                    governorContract = new ethers.Contract(governorAddress, governorAbi, signer);
-                    
-                    // 截断显示钱包地址
-                    const address = signer.address;
-                    document.getElementById("connectBtn").innerText = `${address.substring(0,6)}...${address.substring(38)}`;
-                    document.getElementById("connectBtn").classList.remove("btn-outline");
-                    
-                    document.getElementById("mintBtn").disabled = false;
-                    document.getElementById("proposeBtn").disabled = false;
-                    document.getElementById("status").innerText = "钱包已连接";
-                } catch (err) { console.error(err); }
-            } else { alert("请安装 MetaMask！"); }
-        };
-
-        document.getElementById("mintBtn").onclick = async () => {
-            try {
-                document.getElementById("status").innerText = "正在确认铸造交易...";
-                await (await nftContract.safeMint(signer.address)).wait(); 
-                document.getElementById("status").innerText = "正在激活投票权...";
-                await (await nftContract.delegate(signer.address)).wait();
-                document.getElementById("status").innerText = "🎉 成功！您已获得投票权";
-                document.getElementById("status").classList.add("text-success");
-            } catch (err) { document.getElementById("status").innerText = "❌ 交易失败"; document.getElementById("status").classList.add("text-error"); }
-        };
-
-        document.getElementById("proposeBtn").onclick = async () => {
-            const desc = document.getElementById("descInput").value;
-            if (!desc) return alert("请输入提案描述");
-            try {
-                document.getElementById("proposeStatus").innerText = "等待钱包确认支付押金...";
-                const tx = await governorContract.proposeWithDeposit([signer.address], [0], ["0x"], desc, { value: ethers.parseEther("0.1") });
-                document.getElementById("proposeStatus").innerText = "打包中...";
-                await tx.wait();
-                document.getElementById("proposeStatus").innerText = "✅ 提案发起成功！";
-                document.getElementById("proposeStatus").classList.add("text-success");
-            } catch (err) { document.getElementById("proposeStatus").innerText = "❌ 提案失败"; document.getElementById("proposeStatus").classList.add("text-error");}
-        };
-    </script>
 </body>
 </html>
