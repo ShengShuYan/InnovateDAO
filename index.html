@@ -2,73 +2,125 @@
 <html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InnovateDAO Incubation Fund</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.3/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --app-bg: linear-gradient(160deg, #f0f9ff 0%, #f8fafc 35%, #eef2ff 100%);
+        }
+        body {
+            background: var(--app-bg);
+        }
+    </style>
 </head>
-<body class="bg-base-200 min-h-screen font-sans">
+<body class="min-h-screen text-base-content">
 
-    <div class="navbar bg-base-100 shadow-sm px-8">
-        <div class="flex-1">
-            <a class="btn btn-ghost text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">🏛️ InnovateDAO</a>
+    <div class="navbar bg-base-100/90 backdrop-blur shadow-sm px-4 md:px-8 sticky top-0 z-20 border-b border-base-300">
+        <div class="flex-1 min-w-0">
+            <a class="btn btn-ghost text-lg md:text-2xl font-bold normal-case">InnovateDAO Incubation Fund</a>
         </div>
-        <div class="flex-none">
+        <div class="flex-none flex items-center gap-3">
+            <span id="walletConnectionState" class="badge badge-outline badge-warning">Disconnected</span>
             <button id="connectBtn" class="btn btn-primary btn-outline shadow-sm">Connect Wallet</button>
         </div>
     </div>
 
-    <div class="container mx-auto p-8 max-w-4xl mt-6">
-        <div class="stats shadow-lg bg-base-100 w-full border border-primary/20">
-            <div class="stat text-center">
-                <div class="stat-title">InnovateDAO Members</div>
-                <div class="stat-value text-primary">Students / Faculty</div>
-                <div class="stat-desc">All NFT Holders</div>
+    <main class="container mx-auto px-4 md:px-8 py-6 md:py-10 max-w-6xl space-y-8">
+        <section class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div class="card bg-base-100 shadow-xl border border-base-300 xl:col-span-2">
+                <div class="card-body gap-4">
+                    <h1 class="card-title text-2xl md:text-3xl">DAO Governance Dashboard</h1>
+                    <p class="text-base md:text-lg text-base-content/75">
+                        Follow the process: connect wallet, mint membership NFT, submit proposal, vote, and execute successful proposals.
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
+                        <div class="badge badge-outline py-4 justify-start">1. Connect Wallet</div>
+                        <div class="badge badge-outline py-4 justify-start">2. Mint NFT</div>
+                        <div class="badge badge-outline py-4 justify-start">3. Submit Proposal</div>
+                        <div class="badge badge-outline py-4 justify-start">4. Vote / Execute</div>
+                    </div>
+                    <div id="globalStatus" class="alert alert-info text-sm">
+                        <span>Connect your wallet to begin.</span>
+                    </div>
+                    <p id="networkInfo" class="text-xs text-base-content/60">Network: Not connected</p>
+                </div>
             </div>
-            
-            <div class="stat text-center">
-                <div class="stat-title text-accent">🏛️ Incubation Fund Treasury Balance</div>
-                <div id="treasuryBalance" class="stat-value text-accent">0.00 ETH</div>
-                <div class="stat-desc text-gray-500"> Code is Law - Auto-Disbursement </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="container mx-auto p-8 max-w-4xl mt-2">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
+            <div class="stats stats-vertical shadow-lg bg-base-100 border border-primary/20">
+                <div class="stat">
+                    <div class="stat-title text-base">Connected Wallet</div>
+                    <div id="walletAddress" class="stat-value text-base md:text-lg">Not connected</div>
+                    <div class="stat-desc">MetaMask required</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title text-base">Treasury Balance</div>
+                    <div id="treasuryBalance" class="stat-value text-primary">0.00 ETH</div>
+                    <div class="stat-desc">Governance contract balance</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="card bg-base-100 shadow-xl border border-base-300">
                 <div class="card-body">
-                    <h2 class="card-title text-xl mb-2">🎟️ Membership & Voting Rights</h2>
-                    <p class="text-gray-500 text-sm mb-4">Join the DAO, claim your exclusive NFT pass, and activate your voting rights to co-determine the direction of the campus fund.</p>
+                    <h2 class="card-title text-2xl">Wallet & Membership</h2>
+                    <p class="text-base text-base-content/75">Mint your membership NFT and delegate voting power to yourself.</p>
                     <div class="card-actions justify-end mt-auto">
-                        <button id="mintBtn" class="btn btn-secondary w-full" disabled>Mint NFT & Delegate Votes</button>
+                        <button id="mintBtn" class="btn btn-secondary w-full" disabled>
+                            Mint NFT & Delegate Votes
+                        </button>
                     </div>
-                    <p id="status" class="text-xs text-center mt-2 text-gray-400">Waiting for wallet connection...</p>
+                    <p id="status" class="text-sm mt-2 text-base-content/70">Waiting for wallet connection...</p>
                 </div>
             </div>
 
             <div class="card bg-base-100 shadow-xl border border-base-300">
                 <div class="card-body">
-                    <h2 class="card-title text-xl mb-2">💡 Submit Funding Proposal</h2>
-                    <p class="text-gray-500 text-sm mb-4">Apply for funding for your project. A 0.1 ETH deposit is required to prevent spam proposals.</p>
-                    <input type="text" id="descInput" placeholder="e.g., Request 1 ETH for server costs" class="input input-bordered input-primary w-full mb-2" />
-                    <div class="card-actions justify-end mt-auto">
-                        <button id="proposeBtn" class="btn btn-primary w-full" disabled>Pay 0.1 ETH & Submit Proposal</button>
+                    <h2 class="card-title text-2xl">Submit Proposal</h2>
+                    <p class="text-base text-base-content/75">
+                        A proposal requires a deposit of <span class="font-semibold">0.1 ETH</span>. Fill in all fields before submitting.
+                    </p>
+                    <label class="form-control">
+                        <span class="label-text font-medium">Proposal Description</span>
+                        <textarea id="descInput" rows="3" placeholder="Example: Request 1 ETH to fund prototype cloud infrastructure and security audit." class="textarea textarea-bordered textarea-primary w-full"></textarea>
+                    </label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="form-control">
+                            <span class="label-text font-medium">Transfer Target Address</span>
+                            <input type="text" id="targetInput" placeholder="0x..." class="input input-bordered w-full" />
+                        </label>
+                        <label class="form-control">
+                            <span class="label-text font-medium">Requested Amount (ETH)</span>
+                            <input type="number" id="amountInput" min="0.0001" step="0.0001" placeholder="1.0" class="input input-bordered w-full" />
+                        </label>
                     </div>
-                    <p id="proposeStatus" class="text-xs text-center mt-2 text-gray-400"></p>
+                    <div class="card-actions justify-end mt-auto">
+                        <button id="proposeBtn" class="btn btn-primary w-full" disabled>
+                            Pay 0.1 ETH & Submit Proposal
+                        </button>
+                    </div>
+                    <p id="proposeStatus" class="text-sm mt-2 text-base-content/70">Please complete all required fields.</p>
                 </div>
             </div>
+        </section>
 
-        </div>
-
-        <div class="mt-12">
-            <h2 class="text-2xl font-bold mb-6 border-b pb-2">📋 Proposal Board (In Development)</h2>
-            <div class="alert alert-info shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span>This area will display all active proposals and provide For/Against voting buttons!</span>
+        <section class="mt-4">
+            <div class="flex items-center justify-between mb-4 border-b border-base-300 pb-3">
+                <h2 class="text-2xl md:text-3xl font-bold">Proposal Board</h2>
+                <button id="refreshBtn" class="btn btn-sm btn-outline">Refresh</button>
             </div>
-        </div>
-    </div>
+            <p class="text-sm md:text-base text-base-content/70 mb-4">
+                Active proposals can be voted on. Succeeded proposals can be executed by anyone.
+            </p>
+            <div id="proposalList" class="space-y-4">
+                <div class="alert alert-info shadow-sm">
+                    <span>No proposals loaded yet.</span>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <script src="js/config.js"></script>
