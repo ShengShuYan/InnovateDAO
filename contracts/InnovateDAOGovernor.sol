@@ -81,8 +81,13 @@ contract InnovateDAOGovernor is
         uint256 timepoint = proposalSnapshot(proposalId);
         uint256 totalPastSupply = token().getPastTotalSupply(timepoint);
         
-        // Calculate the strict 33% cap
+        // Calculate the strict 33% cap.
+        // Guardrail: when totalPastSupply is small, integer division may truncate to 0.
+        // Keep the anti-whale cap, but ensure governance can still progress.
         uint256 maxWeight = (totalPastSupply * 33) / 100;
+        if (maxWeight == 0 && totalPastSupply > 0) {
+            maxWeight = 1;
+        }
         
         // Cap the user's weight at maxWeight if it exceeds the limit
         uint256 effectiveWeight = weight > maxWeight ? maxWeight : weight;
