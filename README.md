@@ -58,7 +58,7 @@ Currency Symbol: ETH
 等提案进入 `Active` 后用多个账户投票。
 提案到 `Succeeded` 后执行 `Execute`。
 根据状态尝试 `Claim Refund`（仅提案人可领取，且需满足合约条件）。
-更多演示细节见：`js/DEMO_FLOW.md`。
+
 
 7. 常见问题
 Q1: 提案一直 Pending
