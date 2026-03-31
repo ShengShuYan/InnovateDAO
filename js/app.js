@@ -6,6 +6,17 @@ let currentAccount = "";
 let requiredDepositEth = "0.1";
 const proposalCache = new Map();
 let currentChainId = "";
+const HARDHAT_CHAIN_ID_HEX = "0x539";
+const HARDHAT_NETWORK_PARAMS = {
+    chainId: HARDHAT_CHAIN_ID_HEX,
+    chainName: "Hardhat Local",
+    rpcUrls: ["http://127.0.0.1:8545"],
+    nativeCurrency: {
+        name: "ETH",
+        symbol: "ETH",
+        decimals: 18
+    }
+};
 
 function normalizeTargets(arr) {
     return Array.from(arr || []).map((v) => ethers.getAddress(String(v)));
@@ -266,6 +277,35 @@ async function verifyContractDeployment() {
     }
 }
 
+async function ensureLocalNetwork() {
+    if (!window.ethereum) {
+        throw new Error("MetaMask is not detected. Please install MetaMask first.");
+    }
+
+    const chainId = await window.ethereum.request({ method: "eth_chainId" });
+    if (chainId === HARDHAT_CHAIN_ID_HEX) {
+        return chainId;
+    }
+
+    try {
+        await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: HARDHAT_CHAIN_ID_HEX }]
+        });
+    } catch (err) {
+        if (err?.code !== 4902) {
+            throw err;
+        }
+
+        await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [HARDHAT_NETWORK_PARAMS]
+        });
+    }
+
+    return window.ethereum.request({ method: "eth_chainId" });
+}
+
 async function connectWallet() {
     if (!window.ethereum) {
         setGlobalStatus("MetaMask is not detected. Please install MetaMask first.", "error");
@@ -274,6 +314,13 @@ async function connectWallet() {
 
     setButtonLoading("connectBtn", true, "Connecting...", "Connect Wallet");
     try {
+        setGlobalStatus("Checking MetaMask network...", "info");
+        const ensuredChainId = await ensureLocalNetwork();
+        if (ensuredChainId !== HARDHAT_CHAIN_ID_HEX) {
+            throw new Error("Please switch MetaMask to Hardhat Local (Chain ID 1337).");
+        }
+
+        setGlobalStatus("Requesting wallet access...", "info");
         await window.ethereum.request({ method: "eth_requestAccounts" });
         provider = new ethers.BrowserProvider(window.ethereum);
         signer = await provider.getSigner();
