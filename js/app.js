@@ -211,41 +211,47 @@ function setButtonLoading(buttonId, loading, loadingText, defaultText) {
 }
 
 function setConnectedUI(connected) {
-    const connectBtn = document.getElementById("connectBtn");
-    const stateBadge = document.getElementById("walletConnectionState");
+    const disconnectedView = document.getElementById("disconnectedView");
+    const connectedView = document.getElementById("connectedView");
     const walletAddressEl = document.getElementById("walletAddress");
+    const walletAddressSidebar = document.getElementById("walletAddressSidebar");
     const mintBtn = document.getElementById("mintBtn");
     const proposeBtn = document.getElementById("proposeBtn");
+    const donateBtn = document.getElementById("donateBtn");
 
-    if (!connectBtn || !stateBadge || !walletAddressEl || !mintBtn || !proposeBtn) return;
+    if (!disconnectedView || !connectedView || !walletAddressEl || !mintBtn || !proposeBtn) return;
 
     if (connected) {
-        connectBtn.textContent = "Connected";
-        connectBtn.classList.remove("btn-outline");
-        connectBtn.classList.add("btn-success");
-
-        stateBadge.textContent = "Connected";
-        stateBadge.className = "badge badge-outline badge-success";
-
+        disconnectedView.classList.add("hidden");
+        connectedView.classList.remove("hidden");
+        
         walletAddressEl.textContent = shortAddr(currentAccount);
         walletAddressEl.title = currentAccount;
+        
+        if (walletAddressSidebar) {
+            walletAddressSidebar.textContent = shortAddr(currentAccount);
+            walletAddressSidebar.title = currentAccount;
+        }
 
         mintBtn.disabled = false;
         proposeBtn.disabled = false;
+        if (donateBtn) donateBtn.disabled = false;
     } else {
         proposalCache.clear();
-        connectBtn.textContent = "Connect Wallet";
-        connectBtn.classList.remove("btn-success");
-        connectBtn.classList.add("btn-outline");
-
-        stateBadge.textContent = "Disconnected";
-        stateBadge.className = "badge badge-outline badge-warning";
+        disconnectedView.classList.remove("hidden");
+        connectedView.classList.add("hidden");
 
         walletAddressEl.textContent = "Not connected";
         walletAddressEl.removeAttribute("title");
+        
+        if (walletAddressSidebar) {
+            walletAddressSidebar.textContent = "Not connected";
+            walletAddressSidebar.removeAttribute("title");
+        }
 
         mintBtn.disabled = true;
         proposeBtn.disabled = true;
+        if (donateBtn) donateBtn.disabled = true;
         document.getElementById("treasuryBalance").textContent = "0.00 ETH";
         document.getElementById("proposalList").innerHTML = `<div class="alert alert-info shadow-sm"><span>Please connect wallet to load proposals.</span></div>`;
         setText("networkInfo", "Network: Not connected", "text-xs text-base-content/60");
@@ -519,15 +525,15 @@ function renderProposals(proposals) {
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-1 text-center">
                     <div class="stat bg-base-200 rounded-box py-3 px-2">
                         <div class="stat-title text-sm">For</div>
-                        <div class="stat-value text-2xl text-success">${p.forVotes}</div>
+                        <div class="stat-value text-2xl text-success">${Math.floor(Number(ethers.formatEther(p.forVotes)))}</div>
                     </div>
                     <div class="stat bg-base-200 rounded-box py-3 px-2">
                         <div class="stat-title text-sm">Against</div>
-                        <div class="stat-value text-2xl text-error">${p.againstVotes}</div>
+                        <div class="stat-value text-2xl text-error">${Math.floor(Number(ethers.formatEther(p.againstVotes)))}</div>
                     </div>
                     <div class="stat bg-base-200 rounded-box py-3 px-2">
                         <div class="stat-title text-sm">Abstain</div>
-                        <div class="stat-value text-2xl text-info">${p.abstainVotes}</div>
+                        <div class="stat-value text-2xl text-info">${Math.floor(Number(ethers.formatEther(p.abstainVotes)))}</div>
                     </div>
                 </div>
 
@@ -656,7 +662,76 @@ window.claimRefund = async (proposalId) => {
     }
 };
 
+function disconnectWallet() {
+    currentAccount = "";
+    signer = undefined;
+    provider = undefined;
+    nftContract = undefined;
+    governorContract = undefined;
+    proposalCache.clear();
+    setConnectedUI(false);
+    setGlobalStatus("Wallet disconnected. You can connect with a different account.", "info");
+}
+
+function switchAccount() {
+    setGlobalStatus("Please switch account in MetaMask, then refresh this page or click Connect again.", "info");
+    // 可选：直接请求MetaMask显示账户选择器
+    if (window.ethereum) {
+        window.ethereum.request({ 
+            method: 'wallet_requestPermissions', 
+            params: [{ eth_accounts: {} }] 
+        }).then(() => {
+            connectWallet();
+        }).catch((err) => {
+            console.log("User cancelled account switch:", err);
+        });
+    }
+}
+
+function copyAddress() {
+    if (currentAccount) {
+        navigator.clipboard.writeText(currentAccount).then(() => {
+            setGlobalStatus(`Address copied: ${currentAccount}`, "success");
+        }).catch(() => {
+            setGlobalStatus("Failed to copy address", "error");
+        });
+    }
+}
+
 document.getElementById("connectBtn").onclick = connectWallet;
+document.getElementById("disconnectBtn").onclick = disconnectWallet;
+document.getElementById("switchAccountBtn").onclick = switchAccount;
+document.getElementById("copyAddressBtn").onclick = copyAddress;
+
+// Donate to Treasury功能
+document.getElementById("donateBtn").onclick = async () => {
+    if (!signer || !governorContract) {
+        setGlobalStatus("Please connect wallet first.", "warning");
+        return;
+    }
+    
+    const amount = prompt("Enter amount to donate to Treasury (in ETH):", "1.0");
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+        setGlobalStatus("Invalid amount.", "error");
+        return;
+    }
+    
+    try {
+        setGlobalStatus(`Donating ${amount} ETH to Treasury...`, "info");
+        const governorAddress = await governorContract.getAddress();
+        const tx = await signer.sendTransaction({
+            to: governorAddress,
+            value: ethers.parseEther(amount)
+        });
+        await tx.wait();
+        
+        await refreshTreasuryBalance();
+        setGlobalStatus(`✅ Successfully donated ${amount} ETH to Treasury!`, "success");
+    } catch (err) {
+        const msg = getErrorMessage(err, "Donation failed.");
+        setGlobalStatus(`Donation failed: ${msg}`, "error");
+    }
+};
 
 document.getElementById("mintBtn").onclick = async () => {
     if (!nftContract || !signer) {
@@ -666,6 +741,26 @@ document.getElementById("mintBtn").onclick = async () => {
 
     setButtonLoading("mintBtn", true, "Processing...", "Mint NFT & Delegate Votes");
     try {
+        // 检查是否已经mint过NFT
+        const balance = await nftContract.balanceOf(currentAccount);
+        if (balance > 0n) {
+            // 检查是否已经delegate
+            const currentDelegate = await nftContract.delegates(currentAccount);
+            if (currentDelegate.toLowerCase() === currentAccount.toLowerCase()) {
+                setText("status", "You already have NFT and voting rights.", "text-sm mt-2 text-warning");
+                setGlobalStatus("You already have NFT and voting rights.", "warning");
+                return;
+            } else {
+                // 只需要delegate
+                setText("status", "You have NFT. Activating voting rights...", "text-sm mt-2 text-info");
+                await (await nftContract.delegate(currentAccount)).wait();
+                setText("status", "Success: voting rights activated.", "text-sm mt-2 text-success");
+                setGlobalStatus("Voting rights activated.", "success");
+                return;
+            }
+        }
+
+        // 还没有NFT，执行完整流程
         setText("status", "Step 1/2: Confirm NFT mint transaction in MetaMask...", "text-sm mt-2 text-info");
         await (await nftContract.safeMint(currentAccount)).wait();
 
@@ -760,10 +855,31 @@ if (window.ethereum) {
             nftContract = undefined;
             governorContract = undefined;
             setConnectedUI(false);
-            setGlobalStatus("Wallet disconnected.", "warning");
+            setGlobalStatus("Account disconnected. Please connect wallet again.", "warning");
             return;
         }
-        await connectWallet();
+        
+        const newAccount = accounts[0];
+        if (newAccount !== currentAccount) {
+            currentAccount = newAccount;
+            setGlobalStatus(`Account switched to ${shortAddr(newAccount)}. Reloading data...`, "info");
+            
+            // 重新初始化signer和合约
+            try {
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                nftContract = new ethers.Contract(CONTRACT_ADDRESSES.nft, CONTRACT_ABIS.nft, signer);
+                governorContract = new ethers.Contract(CONTRACT_ADDRESSES.governor, CONTRACT_ABIS.governor, signer);
+                
+                setConnectedUI(true);
+                await loadProposals();
+                await refreshTreasuryBalance();
+                setGlobalStatus(`Successfully switched to account ${shortAddr(newAccount)}`, "success");
+            } catch (err) {
+                console.error("Error reinitializing after account change:", err);
+                setGlobalStatus("Failed to reinitialize. Please refresh the page.", "error");
+            }
+        }
     });
 
     window.ethereum.on("chainChanged", () => {

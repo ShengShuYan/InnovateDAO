@@ -62,6 +62,11 @@ async function main() {
   const governorAddress = await governor.getAddress();
   console.log("✅ InnovateDAOGovernor 部署地址:", governorAddress);
 
+  // 3. Treasury初始余额（用户可使用Donate按钮手动充值）
+  const treasuryBalance = await hre.ethers.provider.getBalance(governorAddress);
+  console.log("\n💰 Treasury初始余额:", hre.ethers.formatEther(treasuryBalance), "ETH");
+  console.log("📝 提示：可通过前端 'Donate to Treasury' 按钮充值");
+
   updateFrontendConfig(nftAddress, governorAddress);
 }
 
