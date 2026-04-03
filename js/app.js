@@ -306,6 +306,51 @@ async function ensureLocalNetwork() {
     return window.ethereum.request({ method: "eth_chainId" });
 }
 
+function clearWalletState() {
+    currentAccount = "";
+    currentChainId = "";
+    signer = undefined;
+    provider = undefined;
+    nftContract = undefined;
+    governorContract = undefined;
+    setConnectedUI(false);
+}
+
+async function hydrateWalletSession(account) {
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner(account);
+    currentAccount = await signer.getAddress();
+    const network = await provider.getNetwork();
+    currentChainId = network.chainId.toString();
+    await verifyContractDeployment();
+
+    nftContract = new ethers.Contract(CONTRACT_ADDRESSES.nft, CONTRACT_ABIS.nft, signer);
+    governorContract = new ethers.Contract(CONTRACT_ADDRESSES.governor, CONTRACT_ABIS.governor, signer);
+
+    if (typeof governorContract.proposalDeposit === "function") {
+        const depositWei = await governorContract.proposalDeposit();
+        requiredDepositEth = ethers.formatEther(depositWei);
+        const proposeBtn = document.getElementById("proposeBtn");
+        if (proposeBtn) {
+            proposeBtn.dataset.defaultText = `Pay ${requiredDepositEth} ETH & Submit Proposal`;
+            proposeBtn.textContent = proposeBtn.dataset.defaultText;
+        }
+    }
+
+    const targetInput = document.getElementById("targetInput");
+    if (targetInput && !targetInput.value.trim()) {
+        targetInput.value = currentAccount;
+    }
+
+    setConnectedUI(true);
+    setText("status", "Ready to mint and delegate voting rights.", "text-sm mt-2 text-info");
+    setText("proposeStatus", "Fill in description, target address, and amount.", "text-sm mt-2 text-base-content/70");
+    setText("networkInfo", `Network: Chain ID ${currentChainId}`, "text-xs text-base-content/60");
+
+    await refreshTreasuryBalance();
+    await loadProposals();
+}
+
 async function connectWallet() {
     if (!window.ethereum) {
         setGlobalStatus("MetaMask is not detected. Please install MetaMask first.", "error");
@@ -321,50 +366,42 @@ async function connectWallet() {
         }
 
         setGlobalStatus("Requesting wallet access...", "info");
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        provider = new ethers.BrowserProvider(window.ethereum);
-        signer = await provider.getSigner();
-        currentAccount = await signer.getAddress();
-        const network = await provider.getNetwork();
-        currentChainId = network.chainId.toString();
-        await verifyContractDeployment();
-
-        nftContract = new ethers.Contract(CONTRACT_ADDRESSES.nft, CONTRACT_ABIS.nft, signer);
-        governorContract = new ethers.Contract(CONTRACT_ADDRESSES.governor, CONTRACT_ABIS.governor, signer);
-
-        if (typeof governorContract.proposalDeposit === "function") {
-            const depositWei = await governorContract.proposalDeposit();
-            requiredDepositEth = ethers.formatEther(depositWei);
-            const proposeBtn = document.getElementById("proposeBtn");
-            if (proposeBtn) {
-                proposeBtn.dataset.defaultText = `Pay ${requiredDepositEth} ETH & Submit Proposal`;
-                proposeBtn.textContent = proposeBtn.dataset.defaultText;
-            }
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        if (!accounts || accounts.length === 0) {
+            throw new Error("No wallet account is available.");
         }
 
-        const targetInput = document.getElementById("targetInput");
-        if (targetInput && !targetInput.value.trim()) {
-            targetInput.value = currentAccount;
-        }
-
-        setConnectedUI(true);
+        await hydrateWalletSession(accounts[0]);
         setGlobalStatus(`Wallet connected: ${shortAddr(currentAccount)}. You can mint NFT or submit proposals now.`, "success");
-        setText("status", "Ready to mint and delegate voting rights.", "text-sm mt-2 text-info");
-        setText("proposeStatus", "Fill in description, target address, and amount.", "text-sm mt-2 text-base-content/70");
-        setText("networkInfo", `Network: Chain ID ${currentChainId}`, "text-xs text-base-content/60");
-
-        await refreshTreasuryBalance();
-        await loadProposals();
     } catch (err) {
         const msg = getErrorMessage(err, "Connection failed.");
         setGlobalStatus(`Wallet connection failed: ${msg}`, "error");
-        currentAccount = "";
-        setConnectedUI(false);
+        clearWalletState();
     } finally {
         setButtonLoading("connectBtn", false, "", "Connect Wallet");
         if (currentAccount && governorContract) {
             setConnectedUI(true);
         }
+    }
+}
+
+async function syncWalletSession() {
+    if (!window.ethereum) return;
+
+    try {
+        const chainId = await window.ethereum.request({ method: "eth_chainId" });
+        const accounts = await window.ethereum.request({ method: "eth_accounts" });
+
+        if (chainId !== HARDHAT_CHAIN_ID_HEX || !accounts || accounts.length === 0) {
+            clearWalletState();
+            return;
+        }
+
+        await hydrateWalletSession(accounts[0]);
+        setGlobalStatus(`Wallet connected: ${shortAddr(currentAccount)}.`, "success");
+    } catch (err) {
+        console.error("syncWalletSession error:", err);
+        clearWalletState();
     }
 }
 
@@ -754,16 +791,11 @@ document.getElementById("refreshBtn").onclick = async () => {
 if (window.ethereum) {
     window.ethereum.on("accountsChanged", async (accounts) => {
         if (!accounts || accounts.length === 0) {
-            currentAccount = "";
-            signer = undefined;
-            provider = undefined;
-            nftContract = undefined;
-            governorContract = undefined;
-            setConnectedUI(false);
+            clearWalletState();
             setGlobalStatus("Wallet disconnected.", "warning");
             return;
         }
-        await connectWallet();
+        await syncWalletSession();
     });
 
     window.ethereum.on("chainChanged", () => {
@@ -772,3 +804,4 @@ if (window.ethereum) {
 }
 
 setConnectedUI(false);
+syncWalletSession();
