@@ -6,6 +6,7 @@ let currentAccount = "";
 let requiredDepositEth = "0.1";
 const proposalCache = new Map();
 let currentChainId = "";
+let toastSequence = 0;
 const HARDHAT_CHAIN_ID_HEX = "0x539";
 const HARDHAT_NETWORK_PARAMS = {
     chainId: HARDHAT_CHAIN_ID_HEX,
@@ -184,6 +185,46 @@ function setGlobalStatus(message, type = "info") {
     statusEl.innerHTML = `<span>${escapeHtml(message)}</span>`;
 }
 
+function showToast(message, type = "info", timeoutMs = 4200) {
+    const container = document.getElementById("toastContainer");
+    if (!container) return;
+
+    const toast = document.createElement("div");
+    const toastId = `toast-${++toastSequence}`;
+    const borderColor = {
+        success: "border-emerald-400/30",
+        warning: "border-amber-400/30",
+        error: "border-rose-400/30",
+        info: "border-sky-400/30"
+    }[type] || "border-sky-400/30";
+
+    toast.id = toastId;
+    toast.className = `toast-item alert ${STATUS_CLASS_MAP[type] || STATUS_CLASS_MAP.info} ${borderColor} shadow-2xl shadow-slate-950/40 border bg-slate-950/90 text-slate-100`;
+    toast.innerHTML = `
+        <div class="flex items-start justify-between gap-3 w-full">
+            <div class="space-y-0.5">
+                <div class="text-xs uppercase tracking-[0.18em] text-slate-300/70">${escapeHtml(type)}</div>
+                <div class="text-sm font-medium text-slate-50">${escapeHtml(message)}</div>
+            </div>
+            <button class="btn btn-ghost btn-xs text-slate-200 hover:bg-white/10">Dismiss</button>
+        </div>
+    `;
+
+    const closeBtn = toast.querySelector("button");
+    const removeToast = () => {
+        if (toast.dataset.state === "leave") return;
+        toast.dataset.state = "leave";
+        window.setTimeout(() => toast.remove(), 220);
+    };
+
+    closeBtn.addEventListener("click", removeToast);
+    container.appendChild(toast);
+
+    if (timeoutMs > 0) {
+        window.setTimeout(removeToast, timeoutMs);
+    }
+}
+
 function setText(id, text, extraClass = "") {
     const el = document.getElementById(id);
     if (!el) return;
@@ -211,50 +252,63 @@ function setButtonLoading(buttonId, loading, loadingText, defaultText) {
 }
 
 function setConnectedUI(connected) {
-    const disconnectedView = document.getElementById("disconnectedView");
-    const connectedView = document.getElementById("connectedView");
+    const connectBtn = document.getElementById("connectBtn");
+    const switchAccountBtn = document.getElementById("switchAccountBtn");
+    const stateBadge = document.getElementById("walletConnectionState");
     const walletAddressEl = document.getElementById("walletAddress");
-    const walletAddressSidebar = document.getElementById("walletAddressSidebar");
     const mintBtn = document.getElementById("mintBtn");
     const proposeBtn = document.getElementById("proposeBtn");
     const donateBtn = document.getElementById("donateBtn");
 
-    if (!disconnectedView || !connectedView || !walletAddressEl || !mintBtn || !proposeBtn) return;
+    if (!connectBtn || !stateBadge || !walletAddressEl || !mintBtn || !proposeBtn || !donateBtn) return;
 
     if (connected) {
-        disconnectedView.classList.add("hidden");
-        connectedView.classList.remove("hidden");
-        
+        connectBtn.textContent = "Connected";
+        connectBtn.classList.remove("btn-outline");
+        connectBtn.classList.add("btn-success");
+
+        if (switchAccountBtn) {
+            switchAccountBtn.textContent = "Disconnect";
+            switchAccountBtn.disabled = false;
+        }
+
+        stateBadge.textContent = "Connected";
+        stateBadge.className = "badge badge-outline badge-success";
+
         walletAddressEl.textContent = shortAddr(currentAccount);
         walletAddressEl.title = currentAccount;
-        
-        if (walletAddressSidebar) {
-            walletAddressSidebar.textContent = shortAddr(currentAccount);
-            walletAddressSidebar.title = currentAccount;
-        }
 
         mintBtn.disabled = false;
         proposeBtn.disabled = false;
-        if (donateBtn) donateBtn.disabled = false;
+        donateBtn.disabled = false;
     } else {
         proposalCache.clear();
-        disconnectedView.classList.remove("hidden");
-        connectedView.classList.add("hidden");
+        connectBtn.textContent = "Connect Wallet";
+        connectBtn.classList.remove("btn-success");
+        connectBtn.classList.add("btn-outline");
+
+        if (switchAccountBtn) {
+            switchAccountBtn.textContent = "Disconnect";
+            switchAccountBtn.disabled = true;
+        }
+
+        stateBadge.textContent = "Disconnected";
+        stateBadge.className = "badge badge-outline badge-warning";
 
         walletAddressEl.textContent = "Not connected";
         walletAddressEl.removeAttribute("title");
-        
-        if (walletAddressSidebar) {
-            walletAddressSidebar.textContent = "Not connected";
-            walletAddressSidebar.removeAttribute("title");
-        }
 
         mintBtn.disabled = true;
         proposeBtn.disabled = true;
-        if (donateBtn) donateBtn.disabled = true;
+        donateBtn.disabled = true;
         document.getElementById("treasuryBalance").textContent = "0.00 ETH";
-        document.getElementById("proposalList").innerHTML = `<div class="alert alert-info shadow-sm"><span>Please connect wallet to load proposals.</span></div>`;
-        setText("networkInfo", "Network: Not connected", "text-xs text-base-content/60");
+        document.getElementById("votingPeriodDisplay").textContent = "Loading...";
+        document.getElementById("quorumDisplay").textContent = "Quorum: Loading...";
+        document.getElementById("depositDisplay").textContent = "Loading...";
+        document.getElementById("votingDelayDisplay").textContent = "Loading...";
+        document.getElementById("supermajorityDisplay").textContent = "Loading...";
+        document.getElementById("proposalList").innerHTML = `<div class="alert alert-info shadow-sm bg-slate-950/50 border border-white/10 text-slate-100"><span>Please connect wallet to load proposals.</span></div>`;
+        setText("networkInfo", "Network: Not connected", "text-xs text-slate-300/70");
     }
 }
 
@@ -263,6 +317,77 @@ async function refreshTreasuryBalance() {
 
     const balanceInWei = await provider.getBalance(CONTRACT_ADDRESSES.governor);
     document.getElementById("treasuryBalance").textContent = `${parseFloat(ethers.formatEther(balanceInWei)).toFixed(4)} ETH`;
+}
+
+function formatBlocks(blocks) {
+    const numeric = Number(blocks || 0);
+    if (!Number.isFinite(numeric)) return String(blocks);
+    const minutes = Math.max(1, Math.round((numeric * 12) / 60));
+    const hours = (minutes / 60).toFixed(minutes >= 120 ? 1 : 0);
+    return `${numeric} blocks (${hours}h)`;
+}
+
+function isLocalHardhatChain() {
+    return currentChainId === "1337" || currentChainId === "31337";
+}
+
+async function advanceLocalBlock() {
+    if (!provider || typeof provider.send !== "function") {
+        throw new Error("Local block mining is not available in the current wallet connection.");
+    }
+
+    await provider.send("evm_mine", []);
+}
+
+async function refreshGovernanceSnapshot() {
+    if (!governorContract) return;
+
+    try {
+        const depositWei = typeof governorContract.proposalDeposit === "function"
+            ? await governorContract.proposalDeposit()
+            : 0n;
+        const votingDelayBlocks = typeof governorContract.votingDelay === "function"
+            ? await governorContract.votingDelay()
+            : 0n;
+        const votingPeriodBlocks = typeof governorContract.votingPeriod === "function"
+            ? await governorContract.votingPeriod()
+            : 0n;
+
+        let quorumText = "Unavailable";
+        if (typeof governorContract.quorum === "function") {
+            try {
+                const currentBlock = await provider.getBlockNumber();
+                const quorumWei = await governorContract.quorum(currentBlock);
+                quorumText = `${quorumWei.toString()} votes required`;
+            } catch (quorumErr) {
+                console.warn("quorum read failed:", quorumErr);
+            }
+        }
+
+        document.getElementById("depositDisplay").textContent = `${ethers.formatEther(depositWei)} ETH`;
+        document.getElementById("votingDelayDisplay").textContent = formatBlocks(votingDelayBlocks);
+        document.getElementById("votingPeriodDisplay").textContent = formatBlocks(votingPeriodBlocks);
+        document.getElementById("quorumDisplay").textContent = `Quorum: ${quorumText}`;
+        document.getElementById("supermajorityDisplay").textContent = "66.6% yes-vote threshold";
+
+        requiredDepositEth = ethers.formatEther(depositWei);
+        const proposeBtn = document.getElementById("proposeBtn");
+        if (proposeBtn) {
+            proposeBtn.dataset.defaultText = `Pay ${requiredDepositEth} ETH & Submit Proposal`;
+            proposeBtn.textContent = proposeBtn.dataset.defaultText;
+        }
+    } catch (err) {
+        console.error("refreshGovernanceSnapshot error:", err);
+        showToast(getErrorMessage(err, "Failed to load governance snapshot."), "warning");
+    }
+}
+
+async function refreshDashboard() {
+    await Promise.allSettled([
+        refreshTreasuryBalance(),
+        loadProposals(),
+        refreshGovernanceSnapshot()
+    ]);
 }
 
 async function verifyContractDeployment() {
@@ -328,42 +453,14 @@ async function connectWallet() {
 
         setGlobalStatus("Requesting wallet access...", "info");
         await window.ethereum.request({ method: "eth_requestAccounts" });
-        provider = new ethers.BrowserProvider(window.ethereum);
-        signer = await provider.getSigner();
-        currentAccount = await signer.getAddress();
-        const network = await provider.getNetwork();
-        currentChainId = network.chainId.toString();
-        await verifyContractDeployment();
+        await initializeConnectedAccount();
 
-        nftContract = new ethers.Contract(CONTRACT_ADDRESSES.nft, CONTRACT_ABIS.nft, signer);
-        governorContract = new ethers.Contract(CONTRACT_ADDRESSES.governor, CONTRACT_ABIS.governor, signer);
-
-        if (typeof governorContract.proposalDeposit === "function") {
-            const depositWei = await governorContract.proposalDeposit();
-            requiredDepositEth = ethers.formatEther(depositWei);
-            const proposeBtn = document.getElementById("proposeBtn");
-            if (proposeBtn) {
-                proposeBtn.dataset.defaultText = `Pay ${requiredDepositEth} ETH & Submit Proposal`;
-                proposeBtn.textContent = proposeBtn.dataset.defaultText;
-            }
-        }
-
-        const targetInput = document.getElementById("targetInput");
-        if (targetInput && !targetInput.value.trim()) {
-            targetInput.value = currentAccount;
-        }
-
-        setConnectedUI(true);
-        setGlobalStatus(`Wallet connected: ${shortAddr(currentAccount)}. You can mint NFT or submit proposals now.`, "success");
-        setText("status", "Ready to mint and delegate voting rights.", "text-sm mt-2 text-info");
-        setText("proposeStatus", "Fill in description, target address, and amount.", "text-sm mt-2 text-base-content/70");
-        setText("networkInfo", `Network: Chain ID ${currentChainId}`, "text-xs text-base-content/60");
-
-        await refreshTreasuryBalance();
-        await loadProposals();
+        showToast(`Connected as ${shortAddr(currentAccount)}`, "success");
+        await refreshDashboard();
     } catch (err) {
         const msg = getErrorMessage(err, "Connection failed.");
         setGlobalStatus(`Wallet connection failed: ${msg}`, "error");
+        showToast(msg, "error");
         currentAccount = "";
         setConnectedUI(false);
     } finally {
@@ -374,11 +471,44 @@ async function connectWallet() {
     }
 }
 
+async function initializeConnectedAccount() {
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    currentAccount = await signer.getAddress();
+    const network = await provider.getNetwork();
+    currentChainId = network.chainId.toString();
+    await verifyContractDeployment();
+
+    nftContract = new ethers.Contract(CONTRACT_ADDRESSES.nft, CONTRACT_ABIS.nft, signer);
+    governorContract = new ethers.Contract(CONTRACT_ADDRESSES.governor, CONTRACT_ABIS.governor, signer);
+
+    if (typeof governorContract.proposalDeposit === "function") {
+        const depositWei = await governorContract.proposalDeposit();
+        requiredDepositEth = ethers.formatEther(depositWei);
+        const proposeBtn = document.getElementById("proposeBtn");
+        if (proposeBtn) {
+            proposeBtn.dataset.defaultText = `Pay ${requiredDepositEth} ETH & Submit Proposal`;
+            proposeBtn.textContent = proposeBtn.dataset.defaultText;
+        }
+    }
+
+    const targetInput = document.getElementById("targetInput");
+    if (targetInput && !targetInput.value.trim()) {
+        targetInput.value = currentAccount;
+    }
+
+    setConnectedUI(true);
+    setGlobalStatus(`Wallet connected: ${shortAddr(currentAccount)}. You can mint NFT or submit proposals now.`, "success");
+    setText("status", "Ready to mint and delegate voting rights.", "text-sm mt-2 text-info");
+    setText("proposeStatus", "Fill in description, target address, and amount.", "text-sm mt-2 text-slate-300/75");
+    setText("networkInfo", `Network: Chain ID ${currentChainId}`, "text-xs text-slate-300/70");
+}
+
 async function loadProposals() {
     const proposalListEl = document.getElementById("proposalList");
     if (!proposalListEl || !governorContract) return;
 
-    proposalListEl.innerHTML = `<div class="alert alert-info shadow-sm"><span>Loading proposals...</span></div>`;
+    proposalListEl.innerHTML = `<div class="alert alert-info shadow-sm bg-slate-950/50 border border-white/10 text-slate-100"><span>Loading proposals...</span></div>`;
 
     try {
         const events = await governorContract.queryFilter(
@@ -388,7 +518,7 @@ async function loadProposals() {
         );
 
         if (!events.length) {
-            proposalListEl.innerHTML = `<div class="alert alert-info shadow-sm"><span>No proposals yet. Submit the first one.</span></div>`;
+            proposalListEl.innerHTML = `<div class="alert alert-info shadow-sm bg-slate-950/50 border border-white/10 text-slate-100"><span>No proposals yet. Submit the first one.</span></div>`;
             return;
         }
 
@@ -429,12 +559,21 @@ async function loadProposals() {
                 const [againstVotes, forVotes, abstainVotes] = await governorContract.proposalVotes(proposalIdRaw);
                 const snapshot = await governorContract.proposalSnapshot(proposalIdRaw);
                 const deadline = await governorContract.proposalDeadline(proposalIdRaw);
+                let hasVoted = false;
                 let deposit = 0n;
                 if (typeof governorContract.deposits === "function") {
                     try {
                         deposit = await governorContract.deposits(proposalIdRaw);
                     } catch (_err) {
                         deposit = 0n;
+                    }
+                }
+
+                if (currentAccount && typeof governorContract.hasVoted === "function") {
+                    try {
+                        hasVoted = await governorContract.hasVoted(proposalIdRaw, currentAccount);
+                    } catch (_err) {
+                        hasVoted = false;
                     }
                 }
 
@@ -458,6 +597,7 @@ async function loadProposals() {
                     deadline: deadline.toString(),
                     deposit: ethers.formatEther(deposit),
                     depositWei: deposit.toString(),
+                    hasVoted,
                     requestedTarget: targets?.[0] || "",
                     requestedAmount: values?.[0] ? ethers.formatEther(values[0]) : "0"
                 };
@@ -481,6 +621,10 @@ async function loadProposals() {
                 "warning"
             );
         }
+
+        if (!failedCount) {
+            setGlobalStatus(`Loaded ${proposals.length} proposals.`, "success");
+        }
     } catch (err) {
         console.error("loadProposals error:", err);
         const msg = getErrorMessage(err, "Failed to load proposals.");
@@ -494,13 +638,18 @@ function renderProposals(proposals) {
     if (!proposalListEl) return;
 
     if (!proposals.length) {
-        proposalListEl.innerHTML = `<div class="alert alert-info shadow-sm"><span>No proposals yet.</span></div>`;
+        proposalListEl.innerHTML = `<div class="alert alert-info shadow-sm bg-slate-950/50 border border-white/10 text-slate-100"><span>No proposals yet.</span></div>`;
         return;
     }
 
     proposalListEl.innerHTML = proposals.map((p) => {
         const canVote = p.state === 1;
         const canExecute = p.state === 4;
+        const voteDisabled = !canVote || p.hasVoted;
+        const voteButtonClass = voteDisabled ? "btn btn-sm btn-disabled opacity-60" : "btn btn-sm";
+        const executeHint = canExecute
+            ? "Execute is available because this proposal is already Succeeded."
+            : "Execute is only available after the proposal reaches Succeeded state.";
         const canClaimRefund =
             currentAccount &&
             p.proposer.toLowerCase() === currentAccount.toLowerCase() &&
@@ -508,39 +657,41 @@ function renderProposals(proposals) {
             p.depositWei !== "0";
 
         return `
-        <div class="card bg-base-100 shadow-xl border border-base-300">
+        <div class="card glass-card border border-white/10">
             <div class="card-body gap-3">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                    <h3 class="card-title text-xl">Proposal #${p.proposalId}</h3>
+                    <h3 class="card-title text-xl text-slate-100">Proposal #${p.proposalId}</h3>
                     <div class="badge ${stateBadgeClass(p.state)}">${stateText(p.state)}</div>
                 </div>
 
-                <p class="text-sm md:text-base text-base-content/70"><span class="font-semibold text-base-content">Proposer:</span> ${shortAddr(p.proposer)}</p>
-                <p class="text-sm md:text-base"><span class="font-semibold">Description:</span> ${escapeHtml(p.description)}</p>
-                <p class="text-sm md:text-base"><span class="font-semibold">Target:</span> ${shortAddr(p.requestedTarget)}</p>
-                <p class="text-sm md:text-base"><span class="font-semibold">Requested Amount:</span> ${p.requestedAmount} ETH</p>
-                <p class="text-sm md:text-base"><span class="font-semibold">Deposit:</span> ${p.deposit} ETH</p>
-                <p class="text-sm md:text-base"><span class="font-semibold">Voting Window:</span> Block ${p.snapshot} to ${p.deadline}</p>
+                <p class="text-sm md:text-base text-slate-300/80"><span class="font-semibold text-slate-100">Proposer:</span> ${shortAddr(p.proposer)}</p>
+                <p class="text-sm md:text-base text-slate-200"><span class="font-semibold text-slate-100">Description:</span> ${escapeHtml(p.description)}</p>
+                <p class="text-sm md:text-base text-slate-200"><span class="font-semibold text-slate-100">Target:</span> ${shortAddr(p.requestedTarget)}</p>
+                <p class="text-sm md:text-base text-slate-200"><span class="font-semibold text-slate-100">Requested Amount:</span> ${p.requestedAmount} ETH</p>
+                <p class="text-sm md:text-base text-slate-200"><span class="font-semibold text-slate-100">Deposit:</span> ${p.deposit} ETH</p>
+                <p class="text-sm md:text-base text-slate-200"><span class="font-semibold text-slate-100">Voting Window:</span> Block ${p.snapshot} to ${p.deadline}</p>
+                <p class="text-xs text-slate-300/70">${p.hasVoted ? "This wallet has already voted on this proposal." : "Voting actions are available only while the proposal is Active."}</p>
+                <p class="text-xs text-slate-300/70">${executeHint}</p>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-1 text-center">
-                    <div class="stat bg-base-200 rounded-box py-3 px-2">
-                        <div class="stat-title text-sm">For</div>
-                        <div class="stat-value text-2xl text-success">${Math.floor(Number(ethers.formatEther(p.forVotes)))}</div>
+                    <div class="stat bg-slate-950/50 border border-white/10 rounded-box py-3 px-2">
+                        <div class="stat-title text-sm text-slate-300">For</div>
+                        <div class="stat-value text-2xl text-emerald-300">${p.forVotes}</div>
                     </div>
-                    <div class="stat bg-base-200 rounded-box py-3 px-2">
-                        <div class="stat-title text-sm">Against</div>
-                        <div class="stat-value text-2xl text-error">${Math.floor(Number(ethers.formatEther(p.againstVotes)))}</div>
+                    <div class="stat bg-slate-950/50 border border-white/10 rounded-box py-3 px-2">
+                        <div class="stat-title text-sm text-slate-300">Against</div>
+                        <div class="stat-value text-2xl text-rose-300">${p.againstVotes}</div>
                     </div>
-                    <div class="stat bg-base-200 rounded-box py-3 px-2">
-                        <div class="stat-title text-sm">Abstain</div>
-                        <div class="stat-value text-2xl text-info">${Math.floor(Number(ethers.formatEther(p.abstainVotes)))}</div>
+                    <div class="stat bg-slate-950/50 border border-white/10 rounded-box py-3 px-2">
+                        <div class="stat-title text-sm text-slate-300">Abstain</div>
+                        <div class="stat-value text-2xl text-sky-300">${p.abstainVotes}</div>
                     </div>
                 </div>
 
                 <div class="card-actions flex-wrap justify-start md:justify-end mt-2">
-                    <button class="btn btn-success btn-sm" onclick="voteProposal('${p.proposalId}', 1)" ${canVote ? "" : "disabled"}>Vote For</button>
-                    <button class="btn btn-error btn-sm" onclick="voteProposal('${p.proposalId}', 0)" ${canVote ? "" : "disabled"}>Vote Against</button>
-                    <button class="btn btn-info btn-sm" onclick="voteProposal('${p.proposalId}', 2)" ${canVote ? "" : "disabled"}>Abstain</button>
+                    <button class="${voteDisabled ? "btn btn-sm btn-disabled opacity-60" : "btn btn-success btn-sm"}" onclick="voteProposal('${p.proposalId}', 1)" ${voteDisabled ? "disabled" : ""}>Vote For</button>
+                    <button class="${voteDisabled ? "btn btn-sm btn-disabled opacity-60" : "btn btn-error btn-sm"}" onclick="voteProposal('${p.proposalId}', 0)" ${voteDisabled ? "disabled" : ""}>Vote Against</button>
+                    <button class="${voteDisabled ? "btn btn-sm btn-disabled opacity-60" : "btn btn-info btn-sm"}" onclick="voteProposal('${p.proposalId}', 2)" ${voteDisabled ? "disabled" : ""}>Abstain</button>
                     <button class="btn btn-primary btn-sm" onclick="executeProposal('${p.proposalId}')" ${canExecute ? "" : "disabled"}>Execute</button>
                     <button class="btn btn-outline btn-sm" onclick="claimRefund('${p.proposalId}')" ${canClaimRefund ? "" : "disabled"}>Claim Refund</button>
                 </div>
@@ -596,10 +747,12 @@ window.voteProposal = async (proposalId, support) => {
         await tx.wait();
 
         setGlobalStatus(`Vote submitted for Proposal #${proposalId}.`, "success");
+        showToast(`Vote submitted for Proposal #${proposalId}`, "success");
         await loadProposals();
     } catch (err) {
         const msg = getErrorMessage(err, "Vote failed.");
         setGlobalStatus(`Vote failed: ${msg}`, "error");
+        showToast(msg, "error");
     }
 };
 
@@ -636,9 +789,11 @@ window.executeProposal = async (proposalId) => {
         await loadProposals();
         await refreshTreasuryBalance();
         setGlobalStatus(`Proposal #${proposalId} executed successfully.`, "success");
+        showToast(`Proposal #${proposalId} executed`, "success");
     } catch (err) {
         const msg = getErrorMessage(err, "Execute failed.");
         setGlobalStatus(`Execute failed: ${msg}`, "error");
+        showToast(msg, "error");
     }
 };
 
@@ -656,80 +811,46 @@ window.claimRefund = async (proposalId) => {
         await loadProposals();
         await refreshTreasuryBalance();
         setGlobalStatus(`Refund claimed for Proposal #${proposalId}.`, "success");
+        showToast(`Refund claimed for Proposal #${proposalId}`, "success");
     } catch (err) {
         const msg = getErrorMessage(err, "Claim refund failed.");
         setGlobalStatus(`Claim refund failed: ${msg}`, "error");
+        showToast(msg, "error");
     }
 };
 
-function disconnectWallet() {
-    currentAccount = "";
-    signer = undefined;
-    provider = undefined;
-    nftContract = undefined;
-    governorContract = undefined;
-    proposalCache.clear();
-    setConnectedUI(false);
-    setGlobalStatus("Wallet disconnected. You can connect with a different account.", "info");
-}
-
-function switchAccount() {
-    setGlobalStatus("Please switch account in MetaMask, then refresh this page or click Connect again.", "info");
-    // 可选：直接请求MetaMask显示账户选择器
-    if (window.ethereum) {
-        window.ethereum.request({ 
-            method: 'wallet_requestPermissions', 
-            params: [{ eth_accounts: {} }] 
-        }).then(() => {
-            connectWallet();
-        }).catch((err) => {
-            console.log("User cancelled account switch:", err);
-        });
-    }
-}
-
-function copyAddress() {
-    if (currentAccount) {
-        navigator.clipboard.writeText(currentAccount).then(() => {
-            setGlobalStatus(`Address copied: ${currentAccount}`, "success");
-        }).catch(() => {
-            setGlobalStatus("Failed to copy address", "error");
-        });
-    }
-}
-
 document.getElementById("connectBtn").onclick = connectWallet;
-document.getElementById("disconnectBtn").onclick = disconnectWallet;
-document.getElementById("switchAccountBtn").onclick = switchAccount;
-document.getElementById("copyAddressBtn").onclick = copyAddress;
 
-// Donate to Treasury功能
-document.getElementById("donateBtn").onclick = async () => {
-    if (!signer || !governorContract) {
-        setGlobalStatus("Please connect wallet first.", "warning");
+document.getElementById("switchAccountBtn").onclick = async () => {
+    if (!window.ethereum) {
+        setGlobalStatus("MetaMask is not detected. Please install MetaMask first.", "error");
+        showToast("MetaMask is not detected.", "error");
         return;
     }
-    
-    const amount = prompt("Enter amount to donate to Treasury (in ETH):", "1.0");
-    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-        setGlobalStatus("Invalid amount.", "error");
-        return;
-    }
-    
+
+    setGlobalStatus("Opening wallet account selector...", "info");
     try {
-        setGlobalStatus(`Donating ${amount} ETH to Treasury...`, "info");
-        const governorAddress = await governorContract.getAddress();
-        const tx = await signer.sendTransaction({
-            to: governorAddress,
-            value: ethers.parseEther(amount)
-        });
-        await tx.wait();
-        
-        await refreshTreasuryBalance();
-        setGlobalStatus(`✅ Successfully donated ${amount} ETH to Treasury!`, "success");
+        try {
+            await window.ethereum.request({
+                method: "wallet_revokePermissions",
+                params: [{ eth_accounts: {} }]
+            });
+        } catch (_err) {
+            // Not all wallets expose permission revocation, so continue to the selection flow.
+        }
+
+        currentAccount = "";
+        signer = undefined;
+        provider = undefined;
+        nftContract = undefined;
+        governorContract = undefined;
+        setConnectedUI(false);
+        setGlobalStatus("Wallet disconnected. Click Connect Wallet again to reconnect or choose another account if MetaMask shows it.", "info");
+        showToast("Wallet disconnected.", "success");
     } catch (err) {
-        const msg = getErrorMessage(err, "Donation failed.");
-        setGlobalStatus(`Donation failed: ${msg}`, "error");
+        const msg = getErrorMessage(err, "Account switch cancelled.");
+        setGlobalStatus(msg, "warning");
+        showToast(msg, "warning");
     }
 };
 
@@ -741,40 +862,71 @@ document.getElementById("mintBtn").onclick = async () => {
 
     setButtonLoading("mintBtn", true, "Processing...", "Mint NFT & Delegate Votes");
     try {
-        // 检查是否已经mint过NFT
-        const balance = await nftContract.balanceOf(currentAccount);
-        if (balance > 0n) {
-            // 检查是否已经delegate
-            const currentDelegate = await nftContract.delegates(currentAccount);
-            if (currentDelegate.toLowerCase() === currentAccount.toLowerCase()) {
-                setText("status", "You already have NFT and voting rights.", "text-sm mt-2 text-warning");
-                setGlobalStatus("You already have NFT and voting rights.", "warning");
-                return;
-            } else {
-                // 只需要delegate
-                setText("status", "You have NFT. Activating voting rights...", "text-sm mt-2 text-info");
-                await (await nftContract.delegate(currentAccount)).wait();
-                setText("status", "Success: voting rights activated.", "text-sm mt-2 text-success");
-                setGlobalStatus("Voting rights activated.", "success");
-                return;
-            }
-        }
-
-        // 还没有NFT，执行完整流程
         setText("status", "Step 1/2: Confirm NFT mint transaction in MetaMask...", "text-sm mt-2 text-info");
         await (await nftContract.safeMint(currentAccount)).wait();
 
         setText("status", "Step 2/2: Confirm delegation transaction...", "text-sm mt-2 text-info");
         await (await nftContract.delegate(currentAccount)).wait();
 
-        setText("status", "Success: you now have voting rights.", "text-sm mt-2 text-success");
+        setText("status", "Success: you now have voting rights.", "text-sm mt-2 text-emerald-300");
         setGlobalStatus("Membership NFT minted and voting rights activated.", "success");
+        showToast("NFT minted and voting rights activated.", "success");
     } catch (err) {
         const msg = getErrorMessage(err, "Mint or delegation failed.");
-        setText("status", `Failed: ${msg}`, "text-sm mt-2 text-error");
+        setText("status", `Failed: ${msg}`, "text-sm mt-2 text-rose-300");
         setGlobalStatus(`Mint flow failed: ${msg}`, "error");
+        showToast(msg, "error");
     } finally {
         setButtonLoading("mintBtn", false, "", "Mint NFT & Delegate Votes");
+    }
+};
+
+document.getElementById("donateBtn").onclick = async () => {
+    if (!signer || !provider || !currentAccount) {
+        setGlobalStatus("Please connect wallet first.", "warning");
+        showToast("Please connect wallet first.", "warning");
+        return;
+    }
+
+    const amountInput = document.getElementById("donateAmountInput");
+    const amount = amountInput?.value?.trim();
+    if (!amount) {
+        setText("donateStatus", "Please enter a donation amount.", "text-sm text-warning");
+        setGlobalStatus("Please enter a donation amount.", "warning");
+        return;
+    }
+
+    let value;
+    try {
+        value = ethers.parseEther(amount);
+    } catch (_err) {
+        setText("donateStatus", "Invalid ETH amount format.", "text-sm text-error");
+        setGlobalStatus("Invalid ETH amount format.", "error");
+        showToast("Invalid ETH amount format.", "error");
+        return;
+    }
+
+    setButtonLoading("donateBtn", true, "Sending...", "Donate to Treasury");
+    try {
+        setText("donateStatus", "Confirm the treasury transfer in MetaMask...", "text-sm text-info");
+        const tx = await signer.sendTransaction({
+            to: CONTRACT_ADDRESSES.governor,
+            value
+        });
+        await tx.wait();
+
+        setText("donateStatus", `Donation sent successfully. Tx: ${tx.hash.slice(0, 10)}...`, "text-sm text-success");
+        setGlobalStatus(`Treasury funded with ${amount} ETH.`, "success");
+        showToast(`Treasury funded with ${amount} ETH`, "success");
+        amountInput.value = "";
+        await refreshTreasuryBalance();
+    } catch (err) {
+        const msg = getErrorMessage(err, "Donation failed.");
+        setText("donateStatus", `Failed: ${msg}`, "text-sm text-error");
+        setGlobalStatus(`Donation failed: ${msg}`, "error");
+        showToast(msg, "error");
+    } finally {
+        setButtonLoading("donateBtn", false, "", "Donate to Treasury");
     }
 };
 
@@ -798,7 +950,7 @@ document.getElementById("proposeBtn").onclick = async () => {
         setText(
             "proposeStatus",
             `Step 1/2: Confirm deposit payment (${requiredDepositEth} ETH) and proposal tx in MetaMask...`,
-            "text-sm mt-2 text-info"
+            "text-sm mt-2 text-sky-300"
         );
 
         const tx = await governorContract.proposeWithDeposit(
@@ -809,20 +961,30 @@ document.getElementById("proposeBtn").onclick = async () => {
             { value: ethers.parseEther(requiredDepositEth) }
         );
 
-        setText("proposeStatus", "Step 2/2: Waiting for transaction confirmation...", "text-sm mt-2 text-info");
+        setText("proposeStatus", "Step 2/2: Waiting for transaction confirmation...", "text-sm mt-2 text-sky-300");
         await tx.wait();
 
-        setText("proposeStatus", "Proposal submitted successfully.", "text-sm mt-2 text-success");
+        setText("proposeStatus", "Proposal submitted successfully.", "text-sm mt-2 text-emerald-300");
         setGlobalStatus("Proposal created. Move to Proposal Board to vote once active.", "success");
 
         document.getElementById("descInput").value = "";
         document.getElementById("amountInput").value = "";
+        if (isLocalHardhatChain()) {
+            try {
+                await advanceLocalBlock();
+                showToast("Local chain advanced by 1 block so the proposal can become active.", "success");
+            } catch (mineErr) {
+                console.warn("auto mine failed:", mineErr);
+                showToast("Proposal created. Mine one local block to activate it.", "warning");
+            }
+        }
         await loadProposals();
         await refreshTreasuryBalance();
     } catch (err) {
         const msg = getErrorMessage(err, "Proposal submission failed.");
         setText("proposeStatus", `Failed: ${msg}`, "text-sm mt-2 text-error");
         setGlobalStatus(`Proposal failed: ${msg}`, "error");
+        showToast(msg, "error");
     } finally {
         setButtonLoading("proposeBtn", false, "", `Pay ${requiredDepositEth} ETH & Submit Proposal`);
     }
@@ -835,10 +997,32 @@ document.getElementById("refreshBtn").onclick = async () => {
     }
 
     setGlobalStatus("Refreshing proposal board...", "info");
-    await loadProposals();
-    await refreshTreasuryBalance();
+    await refreshDashboard();
     setGlobalStatus("Proposal board updated.", "success");
+    showToast("Proposal board updated.", "success");
 };
+
+const advanceBlockBtn = document.getElementById("advanceBlockBtn");
+if (advanceBlockBtn) {
+    advanceBlockBtn.onclick = async () => {
+        if (!provider || !governorContract) {
+            setGlobalStatus("Please connect wallet first.", "warning");
+            return;
+        }
+
+        try {
+            setGlobalStatus("Advancing local chain by 1 block...", "info");
+            await advanceLocalBlock();
+            await refreshDashboard();
+            setGlobalStatus("Local chain advanced.", "success");
+            showToast("Local chain advanced by 1 block.", "success");
+        } catch (err) {
+            const msg = getErrorMessage(err, "Failed to mine a local block.");
+            setGlobalStatus(msg, "error");
+            showToast(msg, "error");
+        }
+    };
+}
 
 ["descInput", "targetInput", "amountInput"].forEach((id) => {
     const input = document.getElementById(id);
@@ -855,31 +1039,11 @@ if (window.ethereum) {
             nftContract = undefined;
             governorContract = undefined;
             setConnectedUI(false);
-            setGlobalStatus("Account disconnected. Please connect wallet again.", "warning");
+            setGlobalStatus("Wallet disconnected.", "warning");
+            showToast("Wallet disconnected.", "warning");
             return;
         }
-        
-        const newAccount = accounts[0];
-        if (newAccount !== currentAccount) {
-            currentAccount = newAccount;
-            setGlobalStatus(`Account switched to ${shortAddr(newAccount)}. Reloading data...`, "info");
-            
-            // 重新初始化signer和合约
-            try {
-                provider = new ethers.BrowserProvider(window.ethereum);
-                signer = await provider.getSigner();
-                nftContract = new ethers.Contract(CONTRACT_ADDRESSES.nft, CONTRACT_ABIS.nft, signer);
-                governorContract = new ethers.Contract(CONTRACT_ADDRESSES.governor, CONTRACT_ABIS.governor, signer);
-                
-                setConnectedUI(true);
-                await loadProposals();
-                await refreshTreasuryBalance();
-                setGlobalStatus(`Successfully switched to account ${shortAddr(newAccount)}`, "success");
-            } catch (err) {
-                console.error("Error reinitializing after account change:", err);
-                setGlobalStatus("Failed to reinitialize. Please refresh the page.", "error");
-            }
-        }
+        await initializeConnectedAccount();
     });
 
     window.ethereum.on("chainChanged", () => {

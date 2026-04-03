@@ -42,6 +42,14 @@ contract InnovateDAOGovernor is
         proposalDeposit = _proposalDeposit;
     }
 
+        function fundTreasury() external payable {
+            require(msg.value > 0, "InnovateDAO: funding amount must be greater than 0");
+        }
+
+        fallback() external payable {
+            require(msg.value > 0, "InnovateDAO: funding amount must be greater than 0");
+        }
+
     // ============ Custom Feature 1: Proposal with Deposit (Anti-Spam) ============
     
     /**
