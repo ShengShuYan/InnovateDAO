@@ -919,7 +919,14 @@ document.getElementById("donateBtn").onclick = async () => {
         setGlobalStatus(`Treasury funded with ${amount} ETH.`, "success");
         showToast(`Treasury funded with ${amount} ETH`, "success");
         amountInput.value = "";
-        await refreshTreasuryBalance();
+
+        try {
+            await refreshTreasuryBalance();
+        } catch (refreshErr) {
+            console.warn("Treasury balance refresh failed after successful donation:", refreshErr);
+            setText("donateStatus", `Donation sent successfully. Tx: ${tx.hash.slice(0, 10)}... Refresh failed, please click Refresh.`, "text-sm text-warning");
+            showToast("Donation succeeded, but balance refresh failed. Please click Refresh.", "warning");
+        }
     } catch (err) {
         const msg = getErrorMessage(err, "Donation failed.");
         setText("donateStatus", `Failed: ${msg}`, "text-sm text-error");
