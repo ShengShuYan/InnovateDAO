@@ -8,10 +8,11 @@ const proposalCache = new Map();
 let currentChainId = "";
 let toastSequence = 0;
 const HARDHAT_CHAIN_ID_HEX = "0x539";
+const HARDHAT_RPC_URL = "http://127.0.0.1:8545";
 const HARDHAT_NETWORK_PARAMS = {
     chainId: HARDHAT_CHAIN_ID_HEX,
     chainName: "Hardhat Local",
-    rpcUrls: ["http://127.0.0.1:8545"],
+    rpcUrls: [HARDHAT_RPC_URL],
     nativeCurrency: {
         name: "ETH",
         symbol: "ETH",
@@ -332,11 +333,24 @@ function isLocalHardhatChain() {
 }
 
 async function advanceLocalBlock() {
-    if (!provider || typeof provider.send !== "function") {
-        throw new Error("Local block mining is not available in the current wallet connection.");
+    if (!isLocalHardhatChain()) {
+        throw new Error("Switch MetaMask to Hardhat Local before mining blocks.");
     }
 
-    await provider.send("evm_mine", []);
+    const response = await fetch(HARDHAT_RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "evm_mine",
+            params: [],
+            id: Date.now()
+        })
+    });
+    const payload = await response.json();
+    if (!response.ok || payload.error) {
+        throw new Error(payload.error?.message || "Hardhat RPC mining request failed.");
+    }
 }
 
 async function refreshGovernanceSnapshot() {
