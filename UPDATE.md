@@ -35,7 +35,7 @@ console.log("Delegate:", delegate);
 
 ### Governance Configuration
 - Voting delay: 1 block
-- Voting period: 50,400 blocks
+- Voting period: 21,600 blocks (~72 hours)
 - Quorum: 60%
 - Supermajority: 66.6%
 - Vote cap per address: 33%
