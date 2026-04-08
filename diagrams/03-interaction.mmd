@@ -1,0 +1,60 @@
+%%{init: {'theme':'base','themeVariables':{
+    'background':'#ffffff',
+    'primaryColor':'#ffffff',
+    'primaryTextColor':'#111111',
+    'primaryBorderColor':'#111111',
+    'lineColor':'#111111',
+    'actorBkg':'#ffffff',
+    'actorBorder':'#111111',
+    'actorTextColor':'#111111',
+    'signalColor':'#111111',
+    'signalTextColor':'#111111',
+    'labelBoxBkgColor':'#ffffff',
+    'labelBoxBorderColor':'#111111',
+    'labelTextColor':'#111111',
+    'fontSize':'12px'
+}}}%%
+sequenceDiagram
+        autonumber
+        actor User
+        participant UI as Frontend
+        participant MM as MetaMask
+        participant NFT as InnovateDAONFT
+        participant GOV as InnovateDAOGovernor
+        participant T as Treasury
+
+        rect rgb(250,250,250)
+        Note over User,T: Phase 1 - Setup
+        User->>UI: connect wallet
+        UI->>MM: request account
+        MM-->>UI: account
+        UI->>MM: safeMint + delegate
+        MM->>NFT: safeMint / delegate
+        NFT-->>MM: ok
+        end
+
+        rect rgb(252,252,252)
+        Note over User,T: Phase 2 - Create Proposal
+        User->>UI: submit proposal
+        UI->>MM: proposeWithDeposit
+        MM->>GOV: proposeWithDeposit
+        GOV->>T: receive deposit
+        GOV-->>MM: proposalId
+        end
+
+        rect rgb(250,250,250)
+        Note over User,T: Phase 3 - Vote
+        User->>UI: cast vote
+        UI->>MM: castVote
+        MM->>GOV: castVote
+        GOV->>NFT: getVotes(snapshot)
+        NFT-->>GOV: voting power
+        GOV-->>MM: vote recorded
+        end
+
+        Note over GOV: pass if quorum >= 60% and majority for
+        User->>UI: execute succeeded proposal
+        UI->>MM: execute
+        MM->>GOV: execute
+        GOV->>T: execute treasury action
+        GOV-->>MM: success

@@ -1,90 +1,81 @@
 InnovateDAO Local Demo Guide
 
-本项目用于本地演示 InnovateDAO 的完整治理流程：
-连接钱包 -> Mint NFT + Delegate -> 提交提案 -> 投票 -> 执行 / 退款。
+This project demonstrates the full local governance flow of InnovateDAO:
+Connect Wallet -> Mint NFT + Delegate -> Submit Proposal -> Vote -> Execute / Refund.
 
-1. 环境准备
-安装 Node.js（建议 v20+，当前本机 v18 也能运行，但 Hardhat 会警告）。
-安装浏览器插件 MetaMask。
-在项目根目录安装依赖：
+1. Environment Setup
+- Install Node.js (v20+ recommended; v18 can run but Hardhat may warn).
+- Install the MetaMask browser extension.
+- Install dependencies in the project root:
 `npm install`
 
-2. 启动本地链与部署合约
-打开两个终端窗口。
-
-第一个终端启动本地链：
+2. Start Local Chain and Deploy Contracts
+- Open two terminal windows.
+- Terminal A (start local chain):
 `npx hardhat node`
-
-第二个终端部署合约：
+- Terminal B (deploy contracts):
 `npx hardhat run scripts/deploy.js --network localhost`
 
-部署成功后会输出两条地址（NFT 和 Governor），并自动更新前端的 `js/config.js`。
+After deployment, NFT and Governor addresses are printed and `js/config.js` is updated automatically.
 
-3. 前端配置说明
-当前部署脚本会自动把新地址写入 `js/config.js`，一般不需要再手动修改。
-如果你重启了 `hardhat node`，本地链状态会重置，需要重新部署一次。
-如果地址和当前本地链会话不一致，前端可能出现：
+3. Frontend Configuration
+- The deploy script writes fresh addresses to `js/config.js`.
+- If `hardhat node` is restarted, chain state is reset and redeployment is required.
+- If frontend addresses do not match the current local chain session, you may see proposal load failures, vote failures, or execute parameter mismatches.
 
-无法加载提案
-投票失败
-execute 参数不匹配
+4. Configure MetaMask Local Network
+When clicking `Connect Wallet`, the app attempts to switch/add the local chain automatically.
+If manual setup is needed, use:
+- Network Name: Hardhat Local
+- RPC URL: http://127.0.0.1:8545
+- Chain ID: 1337
+- Currency Symbol: ETH
 
-4. 配置 MetaMask 本地网络
-点击 `Connect Wallet` 时，前端会尝试自动切换到本地链；如果 MetaMask 中还没有这条网络，也会尝试自动添加。
-如果需要手动添加，请使用：
+Import a test account private key from the `npx hardhat node` terminal output.
 
-Network Name: Hardhat Local
-RPC URL: http://127.0.0.1:8545
-Chain ID: 1337
-Currency Symbol: ETH
-
-从 `npx hardhat node` 终端复制测试账户私钥，导入 MetaMask。
-
-5. 启动前端
-可用 Live Server 打开 `index.html`，或使用任意静态服务器。
-示例（如果你有 Python）：
+5. Start Frontend
+Open `index.html` via Live Server or any static server.
+Example:
 `python3 -m http.server 5500`
 
-浏览器访问：
+Open in browser:
 `http://localhost:5500/?v=20260331`
 
-说明：
-带上 `?v=20260331` 是为了避免浏览器继续使用旧缓存。
+The query string is used to avoid stale browser cache.
 
-6. 最小可行演示流程
-点击 `Connect Wallet`。
-点击 `Mint NFT & Delegate Votes`。
-填写提案信息并点击 `Pay 0.1 ETH & Submit Proposal`。
-等提案进入 `Active` 后用多个账户投票。
-提案到 `Succeeded` 后执行 `Execute`。
-根据状态尝试 `Claim Refund`（仅提案人可领取，且需满足合约条件）。
+6. Minimum Demo Flow
+1. Click `Connect Wallet`.
+2. Click `Mint NFT & Delegate Votes`.
+3. Submit a proposal via `Pay 0.1 ETH & Submit Proposal`.
+4. Wait until proposal is `Active`, then vote with multiple accounts.
+5. Execute when status becomes `Succeeded`.
+6. Use `Claim Refund` when conditions are satisfied.
 
+7. FAQ
+Q1: Proposal remains `Pending`.
+- This is expected until the snapshot/voting delay is reached.
+- On local chain, keep mining blocks by sending transactions or manual mining.
 
-7. 常见问题
-Q1: 提案一直 Pending
-这是正常的，需要等待达到 snapshot 区块（`votingDelay`）。
-在本地链可通过继续发送交易或手动挖块推进区块高度。
+Q2: Vote succeeds but displayed weight is zero.
+- Usually caused by missing valid voting power at snapshot time.
 
-Q2: 投票成功但显示权重为 0
-通常是快照时没有有效投票权（未提前 delegate 或快照前票权不足）。
+Q3: `Execute` fails or reports parameter mismatch.
+- Common causes:
+	- Frontend addresses do not match current deployment.
+	- Different local chain session after node restart.
+	- Proposal has not reached `Succeeded`.
+	- Treasury balance is insufficient.
 
-Q3: Execute failed / params not found
-常见原因：
+Q4: Proposals disappeared after restart.
+- `hardhat node` is ephemeral; restart resets chain state.
 
-前端地址与当前部署不一致
-不是同一条本地链会话（重启 node 后链状态重置）
-提案未达到 Succeeded
-金库余额不足导致执行目标调用失败
-
-Q4: 为什么重启后提案没了
-`hardhat node` 是本地临时链。重启后状态重置，历史提案会消失，需要重新部署并重新创建提案。
-
-Q5: Connect Wallet 一直失败怎么办
-先确认 MetaMask 当前网络是 `Hardhat Local`（Chain ID 1337）。
-如果浏览器仍然读到旧地址或旧脚本，重新打开：
+Q5: `Connect Wallet` keeps failing.
+- Verify MetaMask is on `Hardhat Local` (Chain ID 1337).
+- Reload with:
 `http://localhost:5500/?v=20260331`
 
-8. 演示建议
-演示前固定一套地址，不中途重启 `node`。
-提案前先完成所有需要投票账号的 `mint + delegate`。
-演示 `execute` 前先确认提案状态和金库余额。
+8. Demo Best Practices
+- Use a fixed account set during demo.
+- Do not restart local node mid-demo.
+- Complete `mint + delegate` for all voting accounts before proposal creation.
+- Verify proposal state and treasury balance before execution.

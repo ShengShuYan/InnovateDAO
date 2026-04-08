@@ -1,5 +1,5 @@
-// 给Treasury充值脚本
-// 使用方法: npx hardhat run scripts/fundTreasury.js --network localhost
+// Treasury funding script
+// Usage: npx hardhat run scripts/fundTreasury.js --network localhost
 
 const hre = require("hardhat");
 
@@ -8,17 +8,17 @@ async function main() {
   
   const [owner] = await hre.ethers.getSigners();
   
-  console.log("💰 准备给Treasury充值...");
-  console.log("从账户:", owner.address);
-  console.log("到Treasury:", governorAddress);
+  console.log("💰 Preparing to fund Treasury...");
+  console.log("From account:", owner.address);
+  console.log("To Treasury:", governorAddress);
   
-  // 检查当前余额
+  // Check current balance
   const currentBalance = await hre.ethers.provider.getBalance(governorAddress);
-  console.log("Treasury当前余额:", hre.ethers.formatEther(currentBalance), "ETH");
+  console.log("Current Treasury balance:", hre.ethers.formatEther(currentBalance), "ETH");
   
-  // 充值20 ETH
+  // Fund 20 ETH
   const amount = hre.ethers.parseEther("20");
-  console.log("\n转账中...");
+  console.log("\nSending transaction...");
   
   const tx = await owner.sendTransaction({
     to: governorAddress,
@@ -26,13 +26,13 @@ async function main() {
   });
   
   await tx.wait();
-  console.log("✅ 交易确认:", tx.hash);
+  console.log("✅ Transaction confirmed:", tx.hash);
   
-  // 检查新余额
+  // Check new balance
   const newBalance = await hre.ethers.provider.getBalance(governorAddress);
-  console.log("Treasury新余额:", hre.ethers.formatEther(newBalance), "ETH");
+  console.log("New Treasury balance:", hre.ethers.formatEther(newBalance), "ETH");
   
-  console.log("\n🎉 Treasury充值成功！现在可以创建提案申请资金了。");
+  console.log("\n🎉 Treasury funded successfully. You can now create funding proposals.");
 }
 
 main()

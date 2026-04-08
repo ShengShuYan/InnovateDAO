@@ -15,7 +15,7 @@ contract InnovateDAONFT is ERC721, EIP712, ERC721Votes {
         _safeMint(to, tokenId);
     }
 
-    // --- 必须的重写，让 NFT 具备治理快照能力 ---
+    // --- Required overrides to enable governance snapshot capability ---
     function _update(address to, uint256 tokenId, address auth)
         internal
         override(ERC721, ERC721Votes)

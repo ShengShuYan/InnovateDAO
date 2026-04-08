@@ -53,24 +53,24 @@ console.log("config loaded", CONTRACT_ADDRESSES, CONTRACT_ABIS);
 async function main() {
   const depositAmount = hre.ethers.parseEther("0.1");
 
-  // 1. 部署 NFT
+  // 1. Deploy NFT
   const NFT = await hre.ethers.getContractFactory("InnovateDAONFT");
   const nft = await NFT.deploy();
   await nft.waitForDeployment();
   const nftAddress = await nft.getAddress();
-  console.log("✅ InnovateDAONFT 部署地址:", nftAddress);
+  console.log("✅ InnovateDAONFT deployed at:", nftAddress);
 
-  // 2. 部署 Governor 大脑
+  // 2. Deploy Governor core
   const Governor = await hre.ethers.getContractFactory("InnovateDAOGovernor");
   const governor = await Governor.deploy(nftAddress, depositAmount);
   await governor.waitForDeployment();
   const governorAddress = await governor.getAddress();
-  console.log("✅ InnovateDAOGovernor 部署地址:", governorAddress);
+  console.log("✅ InnovateDAOGovernor deployed at:", governorAddress);
 
-  // 3. Treasury初始余额（用户可使用Donate按钮手动充值）
+  // 3. Treasury initial balance (users can fund it via the Donate button)
   const treasuryBalance = await hre.ethers.provider.getBalance(governorAddress);
-  console.log("\n💰 Treasury初始余额:", hre.ethers.formatEther(treasuryBalance), "ETH");
-  console.log("📝 提示：可通过前端 'Donate to Treasury' 按钮充值");
+  console.log("\n💰 Treasury initial balance:", hre.ethers.formatEther(treasuryBalance), "ETH");
+  console.log("📝 Tip: You can fund it from the frontend via 'Donate to Treasury'.");
 
   updateFrontendConfig(nftAddress, governorAddress);
 }

@@ -1,0 +1,26 @@
+%%{init: {'theme':'base','themeVariables':{
+  'background':'#ffffff',
+  'primaryColor':'#ffffff',
+  'primaryTextColor':'#111111',
+  'primaryBorderColor':'#111111',
+  'lineColor':'#111111',
+  'fontSize':'12px'
+}}}%%
+flowchart LR
+    FE[Frontend + MetaMask]
+  NFT[InnovateDAONFT<br/>membership + votes]
+  GOV[InnovateDAOGovernor<br/>proposal + voting + execute]
+  TR[Treasury<br/>ETH receiver]
+    OZ[OpenZeppelin]
+
+    FE <-->|mint / delegate / read votes| NFT
+    FE <-->|propose / vote / execute| GOV
+    FE <-->|fund / balance query| TR
+
+    GOV -->|uses snapshot votes| NFT
+    GOV -->|executes approved actions| TR
+    NFT -.inherits.-> OZ
+    GOV -.inherits.-> OZ
+
+    classDef n fill:#ffffff,stroke:#111111,color:#111111,stroke-width:1.4px;
+    class FE,NFT,GOV,TR,OZ n;

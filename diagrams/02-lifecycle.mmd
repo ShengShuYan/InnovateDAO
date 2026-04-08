@@ -1,0 +1,21 @@
+%%{init: {'theme':'base','themeVariables':{
+  'background':'#ffffff',
+  'primaryColor':'#ffffff',
+  'primaryTextColor':'#111111',
+  'primaryBorderColor':'#111111',
+  'lineColor':'#111111',
+  'fontSize':'12px'
+}}}%%
+stateDiagram-v2
+  [*] --> Setup : connect + mint + delegate
+  Setup --> Created : proposeWithDeposit
+  Created --> Pending : delay 1 block
+  Pending --> Active : voting open
+  Active --> Closed : voting period end
+
+  Closed --> Succeeded : quorum >= 60% and for > against
+  Closed --> Defeated : otherwise
+
+  Succeeded --> Executed : execute
+  Defeated --> [*]
+  Executed --> [*]
