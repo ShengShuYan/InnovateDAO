@@ -33,7 +33,7 @@ contract InnovateDAOGovernor is
         Governor("InnovateDAOGovernor")
         GovernorSettings(
             1, /* 1 block voting delay */
-            21600, /* Approx. 72 hours voting period (assuming 12s per block) */
+            50400, /* Approx. 1 week voting period (assuming 12s per block) */
             0 /* Proposal threshold (0 since we use deposit instead of token threshold) */
         )
         GovernorVotes(_token)

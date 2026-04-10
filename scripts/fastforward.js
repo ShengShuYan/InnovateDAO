@@ -7,8 +7,8 @@ async function main() {
   const currentBlock = await hre.ethers.provider.getBlockNumber();
   console.log("📊 Current block number:", currentBlock);
   
-  // Fast-forward 21,600 blocks (one full voting period)
-  const blocksToMine = 21600;
+  // Fast-forward 50,400 blocks (one full voting period)
+  const blocksToMine = 50400;
   
   console.log(`⏩ Fast-forwarding ${blocksToMine} blocks...`);
   

@@ -46,7 +46,7 @@ mmdc -i 03-interaction.mmd -o 03-interaction.pdf
   - Anti-spam: Proposal deposit requirement
   - Anti-whale: 33% voting weight cap
   - Quorum: 60% participation required
-  - Timing: 1 block voting delay, ~72 hours voting period
+  - Timing: 1 block voting delay, ~1 week voting period
 
 ### Frontend Components
 - MetaMask wallet integration
